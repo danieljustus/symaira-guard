@@ -671,6 +671,7 @@ func TestClientSourcesForGOOS_Darwin(t *testing.T) {
 }
 
 func TestClientSourcesForGOOS_Linux(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", "")
 	sources := clientSourcesForGOOS("linux", "/home/test")
 	if len(sources) != 5 {
 		t.Fatalf("got %d sources, want 5", len(sources))
