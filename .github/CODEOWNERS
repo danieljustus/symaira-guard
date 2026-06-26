@@ -1,0 +1,5 @@
+# CODEOWNERS: Auto-review assignment for pull requests.
+# Every file in the repo is owned by @danieljustus for review.
+# Expand with team members as contributors join.
+
+* @danieljustus
