@@ -1,1 +1,5 @@
 docs/intern/
+.DS_Store
+
+# Build artifacts
+/symguard

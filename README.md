@@ -140,6 +140,39 @@ Not a chat frontend, not a SIEM, not a cloud-only SaaS, not a VPN replacement, n
 
 ---
 
+## Build
+
+Requires Go 1.26+. No external dependencies — only the Go standard library.
+
+```bash
+# Build the binary
+make build
+
+# Run tests
+make test
+
+# Lint (golangci-lint or go vet fallback)
+make lint
+
+# Set a version string at build time
+make build VERSION=v1.0.0
+```
+
+Or directly with `go`:
+
+```bash
+go build -ldflags "-X main.version=dev" -o symguard ./cmd/symguard
+go vet ./...
+go test ./...
+```
+
+### Quick start
+
+```bash
+./symguard version    # print version and build info
+./symguard doctor     # check system health
+```
+
 ## Status
 
 Early development. See [docs/intern/IDEA.md](docs/intern/IDEA.md) for the full design document.
