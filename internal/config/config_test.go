@@ -228,3 +228,46 @@ shell = "`+string(d)+`"
 		}
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Tests: Load() — integration-style wrapper coverage
+// ---------------------------------------------------------------------------
+
+func TestLoad_MissingFileReturnsDefaults(t *testing.T) {
+	t.Setenv("SYMGUARD_CONFIG", filepath.Join(t.TempDir(), "nonexistent.toml"))
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() with missing file: unexpected error: %v", err)
+	}
+	if cfg.Defaults["shell"] != Ask {
+		t.Errorf("Defaults[shell] = %q, want %q", cfg.Defaults["shell"], Ask)
+	}
+}
+
+func TestLoad_ValidConfig(t *testing.T) {
+	path := writeTempConfig(t, `
+[defaults]
+shell = "deny"
+read_secret = "allow"
+`)
+	t.Setenv("SYMGUARD_CONFIG", path)
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() with valid config: unexpected error: %v", err)
+	}
+	if cfg.Defaults["shell"] != Deny {
+		t.Errorf("Defaults[shell] = %q, want %q", cfg.Defaults["shell"], Deny)
+	}
+	if cfg.Defaults["read_secret"] != Allow {
+		t.Errorf("Defaults[read_secret] = %q, want %q", cfg.Defaults["read_secret"], Allow)
+	}
+}
+
+func TestLoad_OS_InvalidTOML(t *testing.T) {
+	path := writeTempConfig(t, `this is not valid TOML [[[`)
+	t.Setenv("SYMGUARD_CONFIG", path)
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() with invalid TOML: expected error, got nil")
+	}
+}

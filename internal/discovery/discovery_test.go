@@ -3,6 +3,7 @@ package discovery
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -631,7 +632,6 @@ func TestDiscoverAllWithFS(t *testing.T) {
 
 func TestClientSources(t *testing.T) {
 	sources := clientSources()
-	// Should have exactly 5 client sources.
 	if len(sources) != 5 {
 		t.Fatalf("clientSources() returned %d sources, want 5", len(sources))
 	}
@@ -648,6 +648,70 @@ func TestClientSources(t *testing.T) {
 	}
 }
 
+func TestClientSourcesForGOOS_Darwin(t *testing.T) {
+	sources := clientSourcesForGOOS("darwin", "/Users/test")
+	if len(sources) != 5 {
+		t.Fatalf("got %d sources, want 5", len(sources))
+	}
+
+	var claudeSource *clientSource
+	for i, src := range sources {
+		if src.Client == ClientClaudeDesktop {
+			claudeSource = &sources[i]
+			break
+		}
+	}
+	if claudeSource == nil {
+		t.Fatal("no Claude Desktop source found")
+	}
+	want := filepath.Join("/Users/test", "Library", "Application Support", "Claude", "claude_desktop_config.json")
+	if claudeSource.Path != want {
+		t.Errorf("Claude Desktop path = %q, want %q", claudeSource.Path, want)
+	}
+}
+
+func TestClientSourcesForGOOS_Linux(t *testing.T) {
+	sources := clientSourcesForGOOS("linux", "/home/test")
+	if len(sources) != 5 {
+		t.Fatalf("got %d sources, want 5", len(sources))
+	}
+
+	var claudeSource *clientSource
+	for i, src := range sources {
+		if src.Client == ClientClaudeDesktop {
+			claudeSource = &sources[i]
+			break
+		}
+	}
+	if claudeSource == nil {
+		t.Fatal("no Claude Desktop source found")
+	}
+	want := filepath.Join("/home/test", ".config", "claude", "claude_desktop_config.json")
+	if claudeSource.Path != want {
+		t.Errorf("Claude Desktop path = %q, want %q", claudeSource.Path, want)
+	}
+}
+
+func TestClientSourcesForGOOS_Linux_XDG(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", "/custom/xdg")
+	sources := clientSourcesForGOOS("linux", "/home/test")
+
+	var claudeSource *clientSource
+	for i, src := range sources {
+		if src.Client == ClientClaudeDesktop {
+			claudeSource = &sources[i]
+			break
+		}
+	}
+	if claudeSource == nil {
+		t.Fatal("no Claude Desktop source found")
+	}
+	want := filepath.Join("/custom/xdg", "claude", "claude_desktop_config.json")
+	if claudeSource.Path != want {
+		t.Errorf("Claude Desktop path = %q, want %q", claudeSource.Path, want)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Tests: Unsupported client
 // ---------------------------------------------------------------------------
@@ -657,6 +721,100 @@ func TestParseClient_Unsupported(t *testing.T) {
 	_, err := ParseClientWithFS(fsys, "unknown-client", "test.json")
 	if err == nil {
 		t.Fatal("expected error for unsupported client, got nil")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Tests: DiscoverAll() — integration-style wrapper coverage
+// ---------------------------------------------------------------------------
+
+func TestDiscoverAll_MissingFiles(t *testing.T) {
+	// DiscoverAll() with no config files present should return empty, not error.
+	// We can't easily control all file paths without env overrides, but we can
+	// verify it doesn't crash when run in a clean environment.
+	servers, err := DiscoverAll()
+	if err != nil {
+		t.Fatalf("DiscoverAll() error = %v", err)
+	}
+	_ = servers
+}
+
+func TestDiscoverAll_WithRealFiles(t *testing.T) {
+	home := t.TempDir()
+	hermesDir := filepath.Join(home, ".config", "hermes")
+	if err := os.MkdirAll(hermesDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	hermesConfig := filepath.Join(hermesDir, "config.json")
+	hermesData := []byte(`{"mcpServers":{"hermes-tool":{"command":"hermes-cmd"}}}`)
+	if err := os.WriteFile(hermesConfig, hermesData, 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	origHome := os.Getenv("HOME")
+	t.Setenv("HOME", home)
+	t.Cleanup(func() { os.Setenv("HOME", origHome) })
+
+	servers, err := DiscoverAll()
+	if err != nil {
+		t.Fatalf("DiscoverAll() error = %v", err)
+	}
+
+	found := false
+	for _, s := range servers {
+		if s.Client == ClientHermes && s.Name == "hermes-tool" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("DiscoverAll() did not find hermes-tool from real config file")
+	}
+}
+
+func TestParseClient_OS_MissingFile(t *testing.T) {
+	servers, err := ParseClient(ClientHermes, filepath.Join(t.TempDir(), "nonexistent.json"))
+	if err != nil {
+		t.Fatalf("ParseClient() missing file: unexpected error: %v", err)
+	}
+	if servers != nil {
+		t.Fatalf("ParseClient() missing file: got %d servers, want nil", len(servers))
+	}
+}
+
+func TestParseClient_OS_ValidFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	data := []byte(`{"mcpServers":{"my-tool":{"command":"node","args":["server.js"]}}}`)
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	servers, err := ParseClient(ClientHermes, path)
+	if err != nil {
+		t.Fatalf("ParseClient() valid file: unexpected error: %v", err)
+	}
+	if len(servers) != 1 {
+		t.Fatalf("got %d servers, want 1", len(servers))
+	}
+	if servers[0].Name != "my-tool" {
+		t.Errorf("Name = %q, want %q", servers[0].Name, "my-tool")
+	}
+	if servers[0].Command != "node" {
+		t.Errorf("Command = %q, want %q", servers[0].Command, "node")
+	}
+}
+
+func TestParseClient_OS_InvalidJSON(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bad.json")
+	if err := os.WriteFile(path, []byte(`{invalid`), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	_, err := ParseClient(ClientHermes, path)
+	if err == nil {
+		t.Fatal("ParseClient() invalid JSON: expected error, got nil")
 	}
 }
 
