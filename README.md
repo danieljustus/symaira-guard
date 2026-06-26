@@ -4,6 +4,10 @@
 
 **Human control for agent autonomy.**
 
+[![CI](https://github.com/danieljustus/symaira-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/danieljustus/symaira-guard/actions/workflows/ci.yml)
+[![Go](https://img.shields.io/github/go-mod/go-version/danieljustus/symaira-guard)](https://go.dev/)
+[![License](https://img.shields.io/github/license/danieljustus/symaira-guard)](https://github.com/danieljustus/symaira-guard/blob/main/LICENSE)
+
 ---
 
 ## What
@@ -28,6 +32,29 @@ MCP solved interoperability between AI clients and tool servers. It did not solv
 - Cross-agent delegation risk
 
 `symguard` is the missing local control layer.
+
+## Quick demo
+
+```bash
+$ symguard version
+symguard v0.1.0 (commit abc1234, built with Go 1.26)
+
+$ symguard doctor
+✓ CLI config found at ~/.config/symguard/config.toml
+✓ XDG paths OK
+✓ Go runtime 1.26+ detected
+✓ MCP clients found: hermes, claude, cursor
+→ For more detail: symguard scan
+
+$ symguard scan --client hermes
+✓ Scanned Hermes (3 MCP servers, 17 tools)
+
+  symmemory     memory_search, memory_set, entity_list    1 tool changed
+  symvault      get, set, search, health                  4 tools, stable
+  filesystem    read, write, grep, glob, ...              7 new tools
+
+Policy summary: 12 tools allow, 4 tools ask, 1 tool deny
+```
 
 ## What it does
 
