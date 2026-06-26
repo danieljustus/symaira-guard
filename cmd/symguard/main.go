@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"runtime"
 	"time"
@@ -19,27 +20,34 @@ import (
 var version = "dev"
 
 func main() {
-	if len(os.Args) < 2 {
-		printUsage()
-		os.Exit(1)
-	}
-
-	switch os.Args[1] {
-	case "version":
-		cmdVersion()
-	case "doctor":
-		cmdDoctor()
-	case "help", "--help", "-h":
-		printUsage()
-	default:
-		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n", os.Args[1])
-		printUsage()
-		os.Exit(1)
-	}
+	os.Exit(run(os.Args[1:], os.Stdout))
 }
 
-func printUsage() {
-	fmt.Fprintln(os.Stdout, `symguard — local-first security gateway for AI agents
+// run executes the CLI command with the given args and writes output to w.
+// It returns an exit code: 0 for success, 1 for usage errors.
+func run(args []string, w io.Writer) int {
+	if len(args) < 1 {
+		printUsage(w)
+		return 1
+	}
+
+	switch args[0] {
+	case "version":
+		cmdVersion(w)
+	case "doctor":
+		cmdDoctor(w)
+	case "help", "--help", "-h":
+		printUsage(w)
+	default:
+		fmt.Fprintf(w, "unknown command: %s\n\n", args[0])
+		printUsage(w)
+		return 1
+	}
+	return 0
+}
+
+func printUsage(w io.Writer) {
+	fmt.Fprintln(w, `symguard — local-first security gateway for AI agents
 
 Usage:
   symguard <command> [flags]
@@ -52,11 +60,11 @@ Commands:
 Run 'symguard <command> --help' for details on a specific command.`)
 }
 
-func cmdVersion() {
-	fmt.Printf("symguard %s\n", version)
-	fmt.Printf("  go      %s\n", runtime.Version())
-	fmt.Printf("  os/arch %s/%s\n", runtime.GOOS, runtime.GOARCH)
-	fmt.Printf("  built   %s\n", buildTime())
+func cmdVersion(w io.Writer) {
+	fmt.Fprintf(w, "symguard %s\n", version)
+	fmt.Fprintf(w, "  go      %s\n", runtime.Version())
+	fmt.Fprintf(w, "  os/arch %s/%s\n", runtime.GOOS, runtime.GOARCH)
+	fmt.Fprintf(w, "  built   %s\n", buildTime())
 }
 
 func buildTime() string {
@@ -64,21 +72,17 @@ func buildTime() string {
 	if err != nil {
 		return "unknown"
 	}
-	// In a real build the build time would be injected via ldflags.
-	// For now, return a placeholder indicating when this binary was compiled.
 	return fmt.Sprintf("%s (compile-time placeholder)", t.Format("2006-01-02"))
 }
 
-func cmdDoctor() {
-	fmt.Println("symguard doctor")
-	fmt.Println()
-	fmt.Printf("  Version:   %s\n", version)
-	fmt.Printf("  Go:        %s\n", runtime.Version())
-	fmt.Printf("  OS/Arch:   %s/%s\n", runtime.GOOS, runtime.GOARCH)
-	fmt.Println()
+func cmdDoctor(w io.Writer) {
+	fmt.Fprintln(w, "symguard doctor")
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "  Version:   %s\n", version)
+	fmt.Fprintf(w, "  Go:        %s\n", runtime.Version())
+	fmt.Fprintf(w, "  OS/Arch:   %s/%s\n", runtime.GOOS, runtime.GOARCH)
+	fmt.Fprintln(w)
 
-	// Placeholder health checks — real checks will be added with
-	// config, policy, audit, and MCP subsystems in later issues.
 	checks := []struct {
 		name   string
 		status string
@@ -91,9 +95,9 @@ func cmdDoctor() {
 	}
 
 	for _, c := range checks {
-		fmt.Printf("  %-16s %s\n", c.name, c.status)
+		fmt.Fprintf(w, "  %-16s %s\n", c.name, c.status)
 	}
 
-	fmt.Println()
-	fmt.Println("All basic checks passed. Run 'symguard scan' after setup for full diagnostics.")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "All basic checks passed. Run 'symguard scan' after setup for full diagnostics.")
 }
