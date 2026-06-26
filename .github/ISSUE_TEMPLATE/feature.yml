@@ -1,0 +1,45 @@
+name: Feature Request
+description: Suggest an idea for symguard
+title: "[Feature]: "
+labels: [feature]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature! Please fill out the details below.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of the feature you'd like.
+      placeholder: I'd like symguard to be able to ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case
+      description: Describe the problem or workflow this feature would solve.
+      placeholder: This would help when I need to ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Solution
+      description: How do you envision this working? Any implementation ideas?
+      placeholder: Maybe a new command like `symguard ...` or a flag on ...
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: What workarounds or alternatives have you considered?
+      placeholder: I tried doing X instead, but ...
+    validations:
+      required: false
