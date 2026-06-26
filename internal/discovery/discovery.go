@@ -113,8 +113,13 @@ type clientSource struct {
 // clientSources returns the config file locations for all supported clients
 // on the current platform.
 func clientSources() []clientSource {
-	home := homeDir()
+	return clientSourcesForGOOS(runtime.GOOS, homeDir())
+}
 
+// clientSourcesForGOOS is the testable inner implementation of clientSources.
+// It accepts the OS name and home directory as parameters so that both the
+// macOS and Linux branches can be exercised on any platform.
+func clientSourcesForGOOS(goos, home string) []clientSource {
 	sources := []clientSource{
 		// Hermes — cross-platform.
 		{ClientHermes, filepath.Join(home, ".config", "hermes", "config.json")},
@@ -130,7 +135,7 @@ func clientSources() []clientSource {
 	}
 
 	// Claude Desktop — platform-specific path.
-	if runtime.GOOS == "darwin" {
+	if goos == "darwin" {
 		sources = append(sources, clientSource{
 			ClientClaudeDesktop,
 			filepath.Join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json"),
