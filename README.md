@@ -33,30 +33,39 @@ MCP solved interoperability between AI clients and tool servers. It did not solv
 
 `symguard` is the missing local control layer.
 
-## Quick demo
+## Current status (implemented today)
+
+`symguard` is early-stage. The CLI currently implements only:
 
 ```bash
 $ symguard version
-symguard v0.1.0 (commit abc1234, built with Go 1.26)
+symguard dev
+  go      go1.26
+  os/arch darwin/arm64
+  built   2026-01-01 (compile-time placeholder)
 
 $ symguard doctor
-✓ CLI config found at ~/.config/symguard/config.toml
-✓ XDG paths OK
-✓ Go runtime 1.26+ detected
-✓ MCP clients found: hermes, claude, cursor
-→ For more detail: symguard scan
+symguard doctor
+...
+  binary           ok
+  go runtime       ok
+  config           not configured (no config file found)
+  policy           not loaded
+  audit log        not initialized
 
-$ symguard scan --client hermes
-✓ Scanned Hermes (3 MCP servers, 17 tools)
-
-  symmemory     memory_search, memory_set, entity_list    1 tool changed
-  symvault      get, set, search, health                  4 tools, stable
-  filesystem    read, write, grep, glob, ...              7 new tools
-
-Policy summary: 12 tools allow, 4 tools ask, 1 tool deny
+All basic checks passed. Run 'symguard scan' after setup for full diagnostics.
 ```
 
-## What it does
+`doctor` prints a fixed set of static checks; it does not yet read the real
+config file or run live diagnostics. There is no `scan`, `policy`, `proxy`,
+`pin`, `audit`, or `remote` subcommand yet — everything below this point is
+**design intent, not shipped behavior**. Two internal packages exist to
+support this direction: `internal/config` (TOML schema for defaults/rules,
+not yet wired into the CLI) and `internal/discovery` (parses MCP config files
+from Hermes/Claude Desktop/Cursor/VS Code/OpenCode, not yet exposed via any
+command).
+
+## What it does (planned)
 
 ### 1. Scan
 
@@ -88,7 +97,8 @@ match.command_contains = ["rm -rf", "curl | sh"]
 decision = "deny"
 ```
 
-Decisions: `allow`, `ask`, `deny`, `redact`, `readonly`, `sandbox`.
+Decisions: `allow`, `ask`, `deny`, `redact`, `readonly`, `sandbox`. The TOML
+schema for this exists in `internal/config`, but nothing evaluates it yet.
 
 ### 3. Proxy
 
@@ -116,6 +126,9 @@ Append-only local audit log with hash chaining. Records what was requested, whic
 ### 6. Remote access
 
 Later phases add agent-aware remote MCP access over existing transports (SSH, Tailscale, LAN/mDNS) — not a new VPN, but policy and audit on top of tools you already trust.
+
+None of sections 2–6 above are implemented yet — no policy engine, proxy,
+pinning, audit log, or remote-access code exists in this repository today.
 
 ## Risk classes
 
@@ -202,4 +215,8 @@ go test ./...
 
 ## Status
 
-Early development. See [docs/intern/IDEA.md](docs/intern/IDEA.md) for the full design document.
+Very early development. Implemented: `version` and `doctor` CLI commands,
+plus two internal library packages (`config` schema, MCP client `discovery`)
+that are not yet wired into any command. Everything else in this README
+(scan, policy engine, proxy, pinning, audit, remote access) is design intent
+only. See [docs/intern/IDEA.md](docs/intern/IDEA.md) for the full design document.

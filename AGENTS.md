@@ -11,21 +11,11 @@ This file documents coding conventions, project standards, and Symaira-specific 
 
 ```
 symaira-guard/
-├── cmd/symguard/          # CLI entrypoint (main package)
+├── cmd/symguard/          # CLI entrypoint (main package): version, doctor only
 │   └── main.go
 ├── internal/              # Private packages (not importable outside this module)
-│   ├── config/            # TOML config loader, XDG paths, env overrides
-│   ├── discovery/         # MCP config discovery across AI clients
-│   ├── mcp/               # MCP stdio/HTTP proxy, JSON-RPC handling
-│   ├── remote/            # Transport providers: ssh, tailscale, lan/mdns
-│   ├── identity/          # Human/client/agent/run identity model
-│   ├── policy/            # Policy model, matcher, risk classifier
-│   ├── approval/          # TUI/CLI/browser approval prompts
-│   ├── audit/             # Append-only event log, hash chaining
-│   ├── pinning/           # Tool schema hashing, drift detection
-│   ├── diag/              # Explainable diagnostics, policy simulation
-│   ├── redact/            # PII/secret redaction
-│   └── integrations/      # Optional runtime integrations (symvault, symmemory, etc.)
+│   ├── config/            # TOML config schema + loader (exists, not yet wired into CLI)
+│   └── discovery/         # MCP config discovery across AI clients (exists, not yet exposed via a command)
 ├── docs/                  # Documentation
 │   └── intern/            # Internal design docs (IDEA.md)
 ├── go.mod
@@ -34,6 +24,13 @@ symaira-guard/
 ├── README.md
 └── AGENTS.md              # This file
 ```
+
+**Not yet created** (planned subsystems from the design doc — do not assume
+these exist when navigating the repo): `internal/mcp/`, `internal/remote/`,
+`internal/identity/`, `internal/policy/`, `internal/approval/`,
+`internal/audit/`, `internal/pinning/`, `internal/diag/`, `internal/redact/`,
+`internal/integrations/`. Create them only when the corresponding feature is
+actually implemented.
 
 **Rules:**
 - Use `cmd/` for CLI entrypoints, `internal/` for all private logic.
