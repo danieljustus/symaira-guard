@@ -123,6 +123,24 @@ Policy: require re-approval
 
 Append-only local audit log with hash chaining. Records what was requested, which policy matched, who approved, what executed, and what came back.
 
+Hash chaining on its own only guards against **modifying** a retained entry —
+it does not stop **truncating** the log (deleting the most recent entries
+outright; a chain check over what remains still passes, because nothing
+anchors how many entries should exist). `internal/audit` (not yet created)
+must decide, before the first line of code, which of the two guarantees it
+provides:
+
+- **Modification detection** — the hash chain, always in scope.
+- **Truncation detection** — needs an additional mechanism: OS-level
+  append-only enforcement where available (`chattr +a` on Linux, an
+  `O_APPEND`-only file descriptor), and/or a periodically signed, externally
+  stored checkpoint of the chain head (e.g. mirrored to `symmemory`) so a
+  truncated local log is still detectable against the last checkpoint.
+
+Until `internal/audit` ships one of these, "tamper-evident" above means
+modification-evident only — this file will be updated once the truncation
+guarantee (or the decision not to provide one yet) is implemented.
+
 ### 6. Remote access
 
 Later phases add agent-aware remote MCP access over existing transports (SSH, Tailscale, LAN/mDNS) — not a new VPN, but policy and audit on top of tools you already trust.
