@@ -8,6 +8,20 @@
 //
 // with a fallback to ~/.config/symguard/config.toml when XDG_CONFIG_HOME is
 // unset. The SYMGUARD_CONFIG environment variable overrides both.
+//
+// # Schema evolution
+//
+// This schema will grow (new Decision values, new RuleMatch fields, new
+// top-level sections) as policy/proxy/remote subcommands land. Two rules
+// keep older config files loadable by newer builds:
+//
+//  1. New fields and new Decision values are additive only. A config file
+//     that predates a new field must resolve to that field's safe default,
+//     never to a more permissive behavior than the file's author intended.
+//  2. An unrecognized Decision string is rejected (validate fails closed),
+//     intentionally — see TestLoad_InvalidDecision. A typo or a decision
+//     name from a newer schema version must never silently fall through to
+//     an implicit allow.
 package config
 
 import (
@@ -38,10 +52,10 @@ type Defaults map[string]Decision
 // RuleMatch defines the matching criteria for a policy rule. At least one
 // field must be set. Multiple fields are ANDed together.
 type RuleMatch struct {
-	Server           string   `toml:"server,omitempty"`
-	Tool             string   `toml:"tool,omitempty"`
-	Capability       string   `toml:"capability,omitempty"`
-	CommandContains  []string `toml:"command_contains,omitempty"`
+	Server          string   `toml:"server,omitempty"`
+	Tool            string   `toml:"tool,omitempty"`
+	Capability      string   `toml:"capability,omitempty"`
+	CommandContains []string `toml:"command_contains,omitempty"`
 }
 
 // Rule maps a match pattern to a policy decision. Rules are evaluated in
@@ -75,10 +89,10 @@ type RemoteTarget struct {
 
 // Config is the top-level TOML configuration structure for symguard.
 type Config struct {
-	Defaults Defaults `toml:"defaults"`
-	Rules    []Rule   `toml:"rules"`
-	Proxy    ProxyConfig `toml:"proxy"`
-	Audit    AuditConfig `toml:"audit"`
+	Defaults Defaults       `toml:"defaults"`
+	Rules    []Rule         `toml:"rules"`
+	Proxy    ProxyConfig    `toml:"proxy"`
+	Audit    AuditConfig    `toml:"audit"`
 	Remote   []RemoteTarget `toml:"remote"`
 }
 
@@ -92,8 +106,8 @@ func DefaultConfig() *Config {
 			"write_file":  Ask,
 			"network":     Ask,
 		},
-		Rules:  nil,
-		Proxy:  ProxyConfig{},
+		Rules: nil,
+		Proxy: ProxyConfig{},
 		Audit: AuditConfig{
 			Path: "symguard-audit.log",
 		},
