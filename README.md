@@ -123,6 +123,24 @@ Policy: require re-approval
 
 Append-only local audit log with hash chaining. Records what was requested, which policy matched, who approved, what executed, and what came back.
 
+Hash chaining on its own only guards against **modifying** a retained entry —
+it does not stop **truncating** the log (deleting the most recent entries
+outright; a chain check over what remains still passes, because nothing
+anchors how many entries should exist). `internal/audit` (not yet created)
+must decide, before the first line of code, which of the two guarantees it
+provides:
+
+- **Modification detection** — the hash chain, always in scope.
+- **Truncation detection** — needs an additional mechanism: OS-level
+  append-only enforcement where available (`chattr +a` on Linux, an
+  `O_APPEND`-only file descriptor), and/or a periodically signed, externally
+  stored checkpoint of the chain head (e.g. mirrored to `symmemory`) so a
+  truncated local log is still detectable against the last checkpoint.
+
+Until `internal/audit` ships one of these, "tamper-evident" above means
+modification-evident only — this file will be updated once the truncation
+guarantee (or the decision not to provide one yet) is implemented.
+
 ### 6. Remote access
 
 Later phases add agent-aware remote MCP access over existing transports (SSH, Tailscale, LAN/mDNS) — not a new VPN, but policy and audit on top of tools you already trust.
@@ -144,6 +162,19 @@ pinning, audit log, or remote-access code exists in this repository today.
 | `credential_use` | using secrets without revealing them | ask once / scoped |
 | `deploy` | release, push, infra mutation | ask every time |
 | `destructive` | delete, wipe, reset, revoke | ask / deny |
+
+The table above classifies a tool by its **name** alone — a necessary first
+pass, but not sufficient on its own. `scan`'s risk classifier additionally
+caps a tool's risk *downward* (never up) when the tool grants **zero marginal
+capability** beyond one the same client already holds via another tool
+already resolved to `allow` in that session. Example: a `read_file` tool
+classifies as `read_private` above, but if the same client already has an
+unrestricted `shell` tool resolved to `allow`, `read_file` grants no
+capability `shell` didn't already grant — cat is a strict subset of shell —
+so `scan` caps it down to `allow` and states why
+(`no marginal capability over already-allowed tool: shell`). If `shell`
+itself is `ask` or `deny`, `read_file` keeps its `read_private` classification
+unchanged.
 
 ## Symaira ecosystem position
 
