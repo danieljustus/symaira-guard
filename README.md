@@ -145,6 +145,19 @@ pinning, audit log, or remote-access code exists in this repository today.
 | `deploy` | release, push, infra mutation | ask every time |
 | `destructive` | delete, wipe, reset, revoke | ask / deny |
 
+The table above classifies a tool by its **name** alone — a necessary first
+pass, but not sufficient on its own. `scan`'s risk classifier additionally
+caps a tool's risk *downward* (never up) when the tool grants **zero marginal
+capability** beyond one the same client already holds via another tool
+already resolved to `allow` in that session. Example: a `read_file` tool
+classifies as `read_private` above, but if the same client already has an
+unrestricted `shell` tool resolved to `allow`, `read_file` grants no
+capability `shell` didn't already grant — cat is a strict subset of shell —
+so `scan` caps it down to `allow` and states why
+(`no marginal capability over already-allowed tool: shell`). If `shell`
+itself is `ask` or `deny`, `read_file` keeps its `read_private` classification
+unchanged.
+
 ## Symaira ecosystem position
 
 `symguard` is a **public, self-hosted core** tool. No Pro, tenant, or billing code.
