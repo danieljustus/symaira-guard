@@ -41,6 +41,17 @@ checksum:
   name_template: 'checksums.txt'
   algorithm: sha256
 
+signs:
+  - cmd: cosign
+    env:
+      - COSIGN_EXPERIMENTAL=1
+    args:
+      - sign-blob
+      - --yes
+      - '${artifact}'
+    artifacts: all
+    output: true
+
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
 
