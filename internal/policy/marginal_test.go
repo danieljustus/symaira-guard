@@ -137,3 +137,19 @@ func TestMarginalCapabilityCheck_ReadSecretNotCappedByShell(t *testing.T) {
 		t.Error("read_secret should be capped by credential_use")
 	}
 }
+
+// FuzzMarginalCapabilityCheck tests that arbitrary capability names
+// don't cause panics during marginal capability evaluation.
+func FuzzMarginalCapabilityCheck(f *testing.F) {
+	seeds := []string{"shell", "read_private", "read_secret", "", "\x00"}
+	for _, s := range seeds {
+		f.Add(s, "shell")
+		f.Add(s, "")
+		f.Add(s, "\x00")
+	}
+
+	f.Fuzz(func(t *testing.T, toolCap, allowed string) {
+		_ = MarginalCapabilityCheck(toolCap, map[string]bool{allowed: true})
+		_ = MarginalCapabilityCheck(toolCap, nil)
+	})
+}
