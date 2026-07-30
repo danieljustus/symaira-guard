@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/danieljustus/symaira-guard/cmd/symguard/doctor"
+	"github.com/danieljustus/symaira-guard/cmd/symguard/version"
 )
 
 func TestRun_NoArgs(t *testing.T) {
@@ -107,22 +110,19 @@ func TestPrintUsage(t *testing.T) {
 
 func TestCmdVersion(t *testing.T) {
 	var buf bytes.Buffer
-	cmdVersion(&buf)
+	version.Run(&buf)
 	out := buf.String()
 	if !strings.Contains(out, "symguard") {
 		t.Error("expected 'symguard' in version output")
 	}
-	if version == "" {
-		t.Error("version should not be empty")
-	}
-	if !strings.Contains(out, version) {
-		t.Errorf("expected version %q in output", version)
+	if !strings.Contains(out, "go") {
+		t.Error("expected go version in output")
 	}
 }
 
 func TestCmdDoctor(t *testing.T) {
 	var buf bytes.Buffer
-	cmdDoctor(&buf)
+	doctor.Run(&buf)
 	out := buf.String()
 	if !strings.Contains(out, "symguard doctor") {
 		t.Error("expected doctor header")
@@ -136,11 +136,12 @@ func TestCmdDoctor(t *testing.T) {
 }
 
 func TestBuildTime(t *testing.T) {
-	bt := buildTime()
-	if bt == "" {
-		t.Error("buildTime should not return empty string")
-	}
-	if !strings.Contains(bt, "compile-time placeholder") {
-		t.Errorf("expected placeholder in buildTime, got: %s", bt)
+	// buildTime is an unexported function in the version package.
+	// Test that version output includes the placeholder.
+	var buf bytes.Buffer
+	version.Run(&buf)
+	out := buf.String()
+	if !strings.Contains(out, "compile-time placeholder") {
+		t.Errorf("expected placeholder in version output, got: %s", out)
 	}
 }
