@@ -47,8 +47,9 @@ signs:
       - COSIGN_EXPERIMENTAL=1
     args:
       - sign-blob
-      - --yes
-      - '${artifact}'
+      - --output-certificate=${certificate}
+      - --output-signature=${signature}
+      - ${artifact}
     artifacts: all
     output: true
 
