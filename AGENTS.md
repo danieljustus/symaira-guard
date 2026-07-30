@@ -11,8 +11,13 @@ This file documents coding conventions, project standards, and Symaira-specific 
 
 ```
 symaira-guard/
-├── cmd/symguard/          # CLI entrypoint (main package): version, doctor only
-│   └── main.go
+├── cmd/symguard/          # CLI entrypoint (main package): routing only
+│   ├── main.go
+│   ├── main_test.go
+│   ├── doctor/            # `symguard doctor` command
+│   │   └── command.go
+│   └── version/           # `symguard version` command
+│       └── command.go
 ├── internal/              # Private packages (not importable outside this module)
 │   ├── config/            # TOML config schema + loader (exists, not yet wired into CLI)
 │   └── discovery/         # MCP config discovery across AI clients (exists, not yet exposed via a command)
