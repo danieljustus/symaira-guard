@@ -126,20 +126,20 @@ Append-only local audit log with hash chaining. Records what was requested, whic
 Hash chaining on its own only guards against **modifying** a retained entry —
 it does not stop **truncating** the log (deleting the most recent entries
 outright; a chain check over what remains still passes, because nothing
-anchors how many entries should exist). `internal/audit` (not yet created)
-must decide, before the first line of code, which of the two guarantees it
-provides:
+anchors how many entries should exist). `internal/audit` implements both
+guarantees:
 
-- **Modification detection** — the hash chain, always in scope.
-- **Truncation detection** — needs an additional mechanism: OS-level
-  append-only enforcement where available (`chattr +a` on Linux, an
-  `O_APPEND`-only file descriptor), and/or a periodically signed, externally
-  stored checkpoint of the chain head (e.g. mirrored to `symmemory`) so a
-  truncated local log is still detectable against the last checkpoint.
+- **Modification detection** — the hash chain.
+- **Truncation detection** — an external `ChainAnchor` checkpoint file
+  (`.anchor`) records the last entry hash and total entry count after every
+  write. On verification the anchor's count must match the observed entries.
+  The anchor file should be stored with stricter permissions than the log
+  itself; on Linux, `chattr +a` (append-only) prevents its deletion.
 
-Until `internal/audit` ships one of these, "tamper-evident" above means
-modification-evident only — this file will be updated once the truncation
-guarantee (or the decision not to provide one yet) is implemented.
+Until the anchor file is stored on a separate volume or with OS-level
+append-only protection, truncation detection is robust against casual
+tampering but not against a privileged attacker who can delete both files.
+Document this limitation in deployments that accept it.
 
 ### 6. Remote access
 
