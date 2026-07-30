@@ -40,6 +40,10 @@ func run(args []string, w io.Writer) int {
 		printUsage(w)
 		return 1
 	}
+
+	// Non-blocking update check after every command.
+	version.CheckLatest()
+
 	return 0
 }
 

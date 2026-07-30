@@ -2,10 +2,14 @@
 package version
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"os"
 	"runtime"
 	"time"
+
+	"github.com/danieljustus/symaira-guard/internal/update"
 )
 
 // version is set at build time via ldflags.
@@ -25,6 +29,15 @@ func buildTime() string {
 		return "unknown"
 	}
 	return fmt.Sprintf("%s (compile-time placeholder)", t.Format("2006-01-02"))
+}
+
+// CheckLatest queries GitHub and prints an update notice to stderr
+// if a newer release is available. Errors are silently swallowed.
+func CheckLatest() {
+	info := update.Check(context.Background(), version)
+	if msg := update.Format(info); msg != "" {
+		fmt.Fprint(os.Stderr, msg)
+	}
 }
 
 // SetVersion sets the version string at build time.
