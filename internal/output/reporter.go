@@ -13,6 +13,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+
+	"golang.org/x/term"
 )
 
 // Reporter renders a result value to the given writer.
@@ -24,6 +27,10 @@ type Reporter interface {
 // NewReporter returns a Reporter for the given format string.
 // Supported formats: "table" (default), "json".
 func NewReporter(format string) Reporter {
+	return newReporter(resolveFormat(format))
+}
+
+func newReporter(format string) Reporter {
 	switch format {
 	case "json":
 		return &jsonReporter{}
@@ -32,6 +39,33 @@ func NewReporter(format string) Reporter {
 	default:
 		return &tableReporter{}
 	}
+}
+
+// Resolve returns the effective format to use.
+// If explicit is set, it is returned as-is.
+// If empty, "table" is used when stdout is a terminal, "json" when piped.
+func Resolve(explicit string) string {
+	if explicit != "" {
+		return explicit
+	}
+	if isTerminal(os.Stdout) {
+		return "table"
+	}
+	return "json"
+}
+
+func resolveFormat(explicit string) string {
+	return Resolve(explicit)
+}
+
+// isTerminal reports whether w is a terminal file descriptor.
+var isTerminal = func(w *os.File) bool {
+	return term.IsTerminal(int(w.Fd()))
+}
+
+// SetTerminalCheck allows tests to override the terminal detection.
+func SetTerminalCheck(fn func(*os.File) bool) {
+	isTerminal = fn
 }
 
 type jsonReporter struct{}

@@ -3,8 +3,11 @@ package output
 import (
 	"bytes"
 	"encoding/json"
+	"os"
 	"strings"
 	"testing"
+
+	"golang.org/x/term"
 )
 
 func TestNewReporter_Default(t *testing.T) {
@@ -114,5 +117,51 @@ func TestFormatNames(t *testing.T) {
 	}
 	if !hasTable || !hasJSON {
 		t.Error("FormatNames() missing table or json")
+	}
+}
+
+func TestResolve_Explicit(t *testing.T) {
+	if got := Resolve("json"); got != "json" {
+		t.Errorf("Resolve(\"json\") = %q, want json", got)
+	}
+	if got := Resolve("table"); got != "table" {
+		t.Errorf("Resolve(\"table\") = %q, want table", got)
+	}
+}
+
+func TestResolve_EmptyOnTerminal(t *testing.T) {
+	// Simulate terminal
+	SetTerminalCheck(func(*os.File) bool { return true })
+	defer SetTerminalCheck(func(w *os.File) bool { return term.IsTerminal(int(w.Fd())) })
+
+	if got := Resolve(""); got != "table" {
+		t.Errorf("Resolve(\"\") on terminal = %q, want table", got)
+	}
+}
+
+func TestResolve_EmptyOnPipe(t *testing.T) {
+	// Simulate pipe (non-terminal)
+	SetTerminalCheck(func(*os.File) bool { return false })
+	defer SetTerminalCheck(func(w *os.File) bool { return term.IsTerminal(int(w.Fd())) })
+ 
+ 	if got := Resolve(""); got != "json" {
+		t.Errorf("Resolve(\"\") on pipe = %q, want json", got)
+	}
+}
+
+func TestNewReporter_EmptyUsesResolve(t *testing.T) {
+	// On a terminal, empty format should give table reporter
+	SetTerminalCheck(func(*os.File) bool { return true })
+	defer SetTerminalCheck(func(w *os.File) bool { return term.IsTerminal(int(w.Fd())) })
+
+	r := NewReporter("")
+	var buf bytes.Buffer
+	err := r.Print(&buf, "hello")
+	if err != nil {
+		t.Fatalf("Print() error = %v", err)
+	}
+	// table reporter just prints strings directly
+	if !strings.Contains(buf.String(), "hello") {
+		t.Errorf("expected 'hello', got %q", buf.String())
 	}
 }
