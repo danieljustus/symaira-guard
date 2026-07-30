@@ -1,13 +1,12 @@
 // Package policy defines the versioned rule catalog and evaluation engine
-// for symguard's policy subsystem.
+// for symguard's policy subsystem, including marginal-capability risk
+// capping to reduce ask-prompt fatigue.
 //
-// Rules are evaluated in order of precedence (lower number = higher priority).
-// The first matching rule whose Decision is not a pass-through wins.
-// If no rule matches, the capability-based Defaults from config apply.
-//
-// The policy package is independent from MCP transport, UI, and audit storage.
-// It consumes model types for events and decisions but does not import
-// transport or storage packages.
+// Marginal-capability rule: after the static capability-name lookup, cap the
+// resulting risk when a tool grants zero marginal capability — the calling
+// agent/client could already achieve the same effect through another tool
+// already resolved to allow, or through a trust boundary it already sits
+// inside. This only ever caps downward, never up.
 package policy
 
 import (
@@ -27,13 +26,13 @@ type Precedence int
 
 // Rule is a single policy rule with stable identity and deterministic ordering.
 type Rule struct {
-	ID         RuleID          `json:"id"`
-	Version    Version         `json:"version"`
-	Precedence Precedence      `json:"precedence"`
-	Decision   model.Decision  `json:"decision"`
-	Match      MatchCriteria   `json:"match"`
-	Reason     string          `json:"reason,omitempty"`
-	ObserveOnly bool           `json:"observe_only,omitempty"`
+	ID          RuleID          `json:"id"`
+	Version     Version         `json:"version"`
+	Precedence  Precedence      `json:"precedence"`
+	Decision    model.Decision  `json:"decision"`
+	Match       MatchCriteria   `json:"match"`
+	Reason      string          `json:"reason,omitempty"`
+	ObserveOnly bool            `json:"observe_only,omitempty"`
 }
 
 // MatchCriteria defines what a rule matches against.
@@ -48,17 +47,17 @@ type MatchCriteria struct {
 
 // Result is the structured outcome of a policy evaluation.
 type Result struct {
-	Rule        *Rule          `json:"rule,omitempty"`
-	Decision    model.Decision `json:"decision"`
-	Reason      string         `json:"reason,omitempty"`
-	Matched     bool           `json:"matched"`
-	Precedence  Precedence     `json:"precedence,omitempty"`
+	Rule        *Rule           `json:"rule,omitempty"`
+	Decision    model.Decision  `json:"decision"`
+	Reason      string          `json:"reason,omitempty"`
+	Matched     bool            `json:"matched"`
+	Precedence  Precedence      `json:"precedence,omitempty"`
 }
 
 // Catalog is a versioned, validated collection of rules.
 type Catalog struct {
-	Rules      []Rule    `json:"rules"`
-	Version    Version   `json:"version"`
+	Rules      []Rule   `json:"rules"`
+	Version    Version  `json:"version"`
 }
 
 // Evaluate checks a tool call against the catalog and returns the
