@@ -1,0 +1,35 @@
+# Zizmor workflow-security linting.
+#
+# Runs zizmor on every push to main and on PRs that modify any workflow file.
+# Pinned to an exact commit SHA per the pinning convention from issue #41.
+
+name: Zizmor
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  zizmor:
+    name: Check workflow security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Run zizmor
+        uses: zizmorcore/zizmor-action@6fc4b006235f201fdab3722e17240ab420d580e5 # v0.6.1
+        with:
+          args: >
+            .
+          silent: false
