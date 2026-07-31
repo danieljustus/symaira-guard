@@ -30,7 +30,7 @@ func run(args []string, w io.Writer) int {
 
 	switch args[0] {
 	case "version":
-		version.Run(w)
+		version.Run(args[1:], w)
 	case "doctor":
 		doctor.Run(w)
 	case "help", "--help", "-h":

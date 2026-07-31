@@ -9,18 +9,43 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/danieljustus/symaira-corekit/versionkit"
 	"github.com/danieljustus/symaira-guard/internal/update"
 )
 
 // version is set at build time via ldflags.
 var version = "dev"
 
+// SchemaVersion is the versionkit handshake version.
+// Bump whenever machine-readable JSON output changes incompatibly.
+//
+//	1 — initial handshake: {tool, version, schema_version}
+const SchemaVersion = 1
+
 // Run prints version and build information to w.
-func Run(w io.Writer) {
-	fmt.Fprintf(w, "symguard %s\n", version)
+// When args contain "--json", the output is the versionkit.Info JSON payload.
+func Run(args []string, w io.Writer) {
+	info := versionkit.New("symguard", version, SchemaVersion)
+
+	if hasFlag(args, "--json") {
+		info.Write(w)
+		fmt.Fprintln(w)
+		return
+	}
+
+	fmt.Fprintln(w, info.String())
 	fmt.Fprintf(w, "  go      %s\n", runtime.Version())
 	fmt.Fprintf(w, "  os/arch %s/%s\n", runtime.GOOS, runtime.GOARCH)
 	fmt.Fprintf(w, "  built   %s\n", buildTime())
+}
+
+func hasFlag(args []string, flag string) bool {
+	for _, a := range args {
+		if a == flag {
+			return true
+		}
+	}
+	return false
 }
 
 func buildTime() string {

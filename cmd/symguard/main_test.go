@@ -110,7 +110,7 @@ func TestPrintUsage(t *testing.T) {
 
 func TestCmdVersion(t *testing.T) {
 	var buf bytes.Buffer
-	version.Run(&buf)
+	version.Run(nil, &buf)
 	out := buf.String()
 	if !strings.Contains(out, "symguard") {
 		t.Error("expected 'symguard' in version output")
@@ -139,9 +139,52 @@ func TestBuildTime(t *testing.T) {
 	// buildTime is an unexported function in the version package.
 	// Test that version output includes the placeholder.
 	var buf bytes.Buffer
-	version.Run(&buf)
+	version.Run(nil, &buf)
 	out := buf.String()
 	if !strings.Contains(out, "compile-time placeholder") {
 		t.Errorf("expected placeholder in version output, got: %s", out)
+	}
+}
+
+func TestRun_VersionJSON(t *testing.T) {
+	var buf bytes.Buffer
+	code := run([]string{"version", "--json"}, &buf)
+	if code != 0 {
+		t.Errorf("expected exit code 0, got %d", code)
+	}
+	out := buf.String()
+	if !strings.Contains(out, `"tool"`) {
+		t.Error("expected JSON output with 'tool' field")
+	}
+	if !strings.Contains(out, `"version"`) {
+		t.Error("expected JSON output with 'version' field")
+	}
+	if !strings.Contains(out, `"schema_version"`) {
+		t.Error("expected JSON output with 'schema_version' field")
+	}
+}
+
+func TestCmdVersionJSON(t *testing.T) {
+	var buf bytes.Buffer
+	version.Run([]string{"--json"}, &buf)
+	out := buf.String()
+	if !strings.Contains(out, `"tool":"symguard"`) {
+		t.Errorf("expected JSON tool field, got: %s", out)
+	}
+	if !strings.Contains(out, `"schema_version":1`) {
+		t.Errorf("expected schema_version 1, got: %s", out)
+	}
+}
+
+func TestCmdVersionPlainIsStringFormat(t *testing.T) {
+	var buf bytes.Buffer
+	version.Run(nil, &buf)
+	out := buf.String()
+	// Info.String() returns "tool vX.Y.Z"
+	if !strings.Contains(out, "symguard") {
+		t.Error("expected 'symguard' in output")
+	}
+	if !strings.Contains(out, "go") {
+		t.Error("expected go version in output")
 	}
 }
