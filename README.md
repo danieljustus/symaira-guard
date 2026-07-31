@@ -211,6 +211,14 @@ Not a chat frontend, not a SIEM, not a cloud-only SaaS, not a VPN replacement, n
 
 ---
 
+## Install
+
+```bash
+go install github.com/danieljustus/symaira-guard/cmd/symguard@latest
+```
+
+Or build from source:
+
 ## Build
 
 Requires Go 1.26+. No external dependencies — only the Go standard library.
@@ -237,11 +245,33 @@ go vet ./...
 go test ./...
 ```
 
-### Quick start
+## Usage
 
 ```bash
-./symguard version    # print version and build info
-./symguard doctor     # check system health
+# Version info (human-readable)
+symguard version
+
+# Version info (machine-readable JSON for GUI tools)
+symguard version --json
+
+# System health check
+symguard doctor
+```
+
+## Development
+
+```bash
+git clone https://github.com/danieljustus/symaira-guard.git
+cd symaira-guard
+
+# Build
+go build -o symguard ./cmd/symguard
+
+# Test
+go test ./...
+
+# Lint
+go vet ./...
 ```
 
 ## Status
