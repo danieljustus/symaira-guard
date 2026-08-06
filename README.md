@@ -95,10 +95,21 @@ decision = "allow"
 [[rules]]
 match.command_contains = ["rm -rf", "curl | sh"]
 decision = "deny"
+
+# Optional: stateful repetition detector (off by default).
+# Blocks the Nth in-window call with the same tool+input (default 3) and
+# fuzzy-matches near-identical searches. Denies are recoverable — the agent
+# can retry with a different call; the session is never aborted.
+[sequence]
+enabled = false
+threshold = 3
 ```
 
 Decisions: `allow`, `ask`, `deny`, `redact`, `readonly`, `sandbox`. The TOML
 schema for this exists in `internal/config`, but nothing evaluates it yet.
+The sequence detector lives in `internal/sequence` and is exposed to the
+policy layer via `policy.NewSequenceRule`; proxy wiring lands with the
+interception path.
 
 ### 3. Proxy
 

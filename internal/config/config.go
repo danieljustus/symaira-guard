@@ -87,6 +87,15 @@ type RemoteTarget struct {
 	Labels         []string `toml:"labels,omitempty"`
 }
 
+// SequenceConfig enables the optional stateful repetition detector
+// (internal/sequence). It is off by default so symguard stays stateless
+// unless explicitly opted in. Threshold is the in-window call count that
+// blocks a repeated tool+input signature (0 or absent resolves to 3).
+type SequenceConfig struct {
+	Enabled   bool `toml:"enabled,omitempty"`
+	Threshold int  `toml:"threshold,omitempty"`
+}
+
 // Config is the top-level TOML configuration structure for symguard.
 type Config struct {
 	Defaults Defaults       `toml:"defaults"`
@@ -94,6 +103,7 @@ type Config struct {
 	Proxy    ProxyConfig    `toml:"proxy"`
 	Audit    AuditConfig    `toml:"audit"`
 	Remote   []RemoteTarget `toml:"remote"`
+	Sequence SequenceConfig `toml:"sequence"`
 }
 
 // DefaultConfig returns a Config with sensible defaults. When no config file
@@ -112,6 +122,10 @@ func DefaultConfig() *Config {
 			Path: "symguard-audit.log",
 		},
 		Remote: nil,
+		Sequence: SequenceConfig{
+			Enabled:   false, // opt-in: stateless by default
+			Threshold: 3,
+		},
 	}
 }
 
@@ -188,6 +202,13 @@ func validate(cfg *Config) error {
 		Allow: true, Ask: true, Deny: true, Redact: true, ReadOnly: true, Sandbox: true,
 	}
 
+	// An omitted [sequence] threshold decodes to 0; resolve it to the
+	// documented default before validation so explicit invalid values
+	// (1, negative) stay distinguishable.
+	if cfg.Sequence.Enabled && cfg.Sequence.Threshold == 0 {
+		cfg.Sequence.Threshold = 3
+	}
+
 	for cap, d := range cfg.Defaults {
 		if !validDecisions[d] {
 			return fmt.Errorf("defaults.%q: invalid decision %q (allowed: allow, ask, deny, redact, readonly, sandbox)", cap, d)
@@ -201,6 +222,10 @@ func validate(cfg *Config) error {
 		if rule.Match.Server == "" && rule.Match.Tool == "" && rule.Match.Capability == "" && len(rule.Match.CommandContains) == 0 {
 			return fmt.Errorf("rules[%d]: match must specify at least one criterion (server, tool, capability, command_contains)", i)
 		}
+	}
+
+	if cfg.Sequence.Enabled && cfg.Sequence.Threshold < 2 {
+		return fmt.Errorf("sequence.threshold: must be at least 2 when sequence is enabled (got %d)", cfg.Sequence.Threshold)
 	}
 
 	return nil
