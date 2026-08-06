@@ -13,6 +13,7 @@ import (
 	"os"
 
 	"github.com/danieljustus/symaira-guard/cmd/symguard/doctor"
+	"github.com/danieljustus/symaira-guard/cmd/symguard/grants"
 	"github.com/danieljustus/symaira-guard/cmd/symguard/version"
 )
 
@@ -33,6 +34,8 @@ func run(args []string, w io.Writer) int {
 		version.Run(args[1:], w)
 	case "doctor":
 		doctor.Run(w)
+	case "grants":
+		grants.Run(args[1:], w)
 	case "help", "--help", "-h":
 		printUsage(w)
 	default:
@@ -56,6 +59,7 @@ Usage:
 Commands:
   version   Print version and build info
   doctor    Check system health and configuration
+  grants    List and revoke standing grants
   help      Show this help message
 
 Run 'symguard <command> --help' for details on a specific command.`)
