@@ -52,17 +52,17 @@ type Defaults map[string]Decision
 // RuleMatch defines the matching criteria for a policy rule. At least one
 // field must be set. Multiple fields are ANDed together.
 type RuleMatch struct {
-	Server          string   `toml:"server,omitempty"`
-	Tool            string   `toml:"tool,omitempty"`
-	Capability      string   `toml:"capability,omitempty"`
-	CommandContains []string `toml:"command_contains,omitempty"`
+	Server          string   `toml:"server,omitempty" json:"server,omitempty"`
+	Tool            string   `toml:"tool,omitempty" json:"tool,omitempty"`
+	Capability      string   `toml:"capability,omitempty" json:"capability,omitempty"`
+	CommandContains []string `toml:"command_contains,omitempty" json:"command_contains,omitempty"`
 }
 
 // Rule maps a match pattern to a policy decision. Rules are evaluated in
 // order; the first matching rule wins.
 type Rule struct {
-	Match    RuleMatch `toml:"match"`
-	Decision Decision  `toml:"decision"`
+	Match    RuleMatch `toml:"match" json:"match"`
+	Decision Decision  `toml:"decision" json:"decision"`
 }
 
 // ProxyConfig holds upstream MCP server configuration for proxy mode.

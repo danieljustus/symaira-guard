@@ -23,7 +23,7 @@ type Manifest struct {
 	CaseID        string            `json:"case_id"`
 	CreatedAt     string            `json:"created_at"` // RFC 3339
 	RecordCounts  map[string]int    `json:"record_counts"`
-	Digests       map[string]string `json:"digests"`  // SHA-256 per stream
+	Digests       map[string]string `json:"digests"` // SHA-256 per stream
 	SourceRepo    string            `json:"source_repo,omitempty"`
 	Unsigned      bool              `json:"unsigned"`
 }
@@ -37,26 +37,38 @@ type CaseBundle struct {
 
 // Event is a normalized audit event record.
 type Event struct {
-	ID           string       `json:"id"`
-	SchemaVer    int          `json:"schema_version"`
-	EventType    string       `json:"event_type"`
-	AgentID      string       `json:"agent_id,omitempty"`
-	Server       string       `json:"server,omitempty"`
-	Tool         string       `json:"tool,omitempty"`
-	Capability   string       `json:"capability,omitempty"`
-	Decision     string       `json:"decision"`
-	Evidence     []EvidenceRef `json:"evidence,omitempty"`
-	Redacted     bool         `json:"redacted"`
-	Timestamp    string       `json:"timestamp"` // RFC 3339
+	ID         string        `json:"id"`
+	SchemaVer  int           `json:"schema_version"`
+	EventType  string        `json:"event_type"`
+	AgentID    string        `json:"agent_id,omitempty"`
+	Server     string        `json:"server,omitempty"`
+	Tool       string        `json:"tool,omitempty"`
+	Capability string        `json:"capability,omitempty"`
+	Decision   string        `json:"decision"`
+	Evidence   []EvidenceRef `json:"evidence,omitempty"`
+	Redacted   bool          `json:"redacted"`
+	Timestamp  string        `json:"timestamp"` // RFC 3339
 }
 
 // Decision is a portable approval decision record.
 type Decision struct {
-	ID         string `json:"id"`
-	RequestID  string `json:"request_id"`
-	Approved   bool   `json:"approved"`
-	Reason     string `json:"reason,omitempty"`
-	DecidedAt  string `json:"decided_at"` // RFC 3339
+	ID        string `json:"id"`
+	RequestID string `json:"request_id"`
+	Approved  bool   `json:"approved"`
+	Reason    string `json:"reason,omitempty"`
+	DecidedAt string `json:"decided_at"` // RFC 3339
+}
+
+// ProposalApplied is a portable audit record for an applied policy
+// proposal. It is the proposal counterpart of Decision: it identifies
+// the resulting rule and the human who applied it, so a rule's
+// provenance can be traced through the audit chain.
+type ProposalApplied struct {
+	ProposalID string `json:"proposal_id"`
+	Action     string `json:"action"`     // "set" or "delete"
+	Rule       string `json:"rule"`       // canonical JSON of the resulting rule
+	AppliedBy  string `json:"applied_by"` // human who applied the proposal
+	AppliedAt  string `json:"applied_at"` // RFC 3339
 }
 
 // NewManifest creates a manifest with default values for the current schema.
