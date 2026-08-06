@@ -224,6 +224,27 @@ Refs #3
 
 ## Symaira-Specific Rules
 
+### Room ↔ Guard Boundary (Do Not Weaken)
+
+| | Guard | Room |
+|---|---|---|
+| Question | May this concrete *call* happen right now? | Is this *operation* approved, and where is the record that it happened? |
+| Unit | single tool call | run, checkpoint, decision |
+| Position | in the data path (proxy) | beside the data path (bookkeeping) |
+| Risk classification | core competence | none |
+| Record | hash-chain call audit | signed room journal |
+
+Guard decides **whether** a call must be asked about or blocked (risk classification,
+allow/ask/deny, schema pinning, call-level audit). The room is **where** an operation is
+asked about and recorded (participants, signed work journal, approvals with scope and
+TTL). Guard may use the room as its approval backend through the frozen contract; the
+room performs no risk classification and never sits in the data path.
+
+> Feature requests for room-side risk classes, per-call ask/deny or policy evaluation
+> belong in this repo (`symaira-guard`) and must be implemented here, not in the room.
+> See [`symaira-room`'s approval backend contract](https://github.com/danieljustus/symaira-room/blob/main/docs/approval-contract.md)
+> for the frozen interface `symguard` uses when the room is the approval backend.
+
 ### Binary Name
 
 The binary is always named `symguard`. Do not use alternative names.
