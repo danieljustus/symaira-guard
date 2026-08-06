@@ -67,6 +67,7 @@ const (
 	DecisionAllow    Decision = "allow"
 	DecisionAsk      Decision = "ask"
 	DecisionDeny     Decision = "deny"
+	DecisionRequire  Decision = "require" // rule that must hold; see internal/policy bucket evaluation
 	DecisionRedact   Decision = "redact"
 	DecisionReadOnly Decision = "readonly"
 	DecisionSandbox  Decision = "sandbox"
@@ -90,12 +91,12 @@ type ToolCall struct {
 	Server     string `json:"server"`
 	Tool       string `json:"tool"`
 	Args       any    `json:"args,omitempty"`       // redacted before leaving the control boundary
-	Result     any    `json:"result,omitempty"`      // redacted before leaving the control boundary
-	ArgsRef    string `json:"args_ref,omitempty"`    // safe reference to the raw args
-	ResultRef  string `json:"result_ref,omitempty"`  // safe reference to the raw result
-	Capability string `json:"capability,omitempty"`  // risk-class key (e.g. "shell", "read_secret")
-	RiskClass  string `json:"risk_class,omitempty"`  // resolved risk classification
-	Error      string `json:"error,omitempty"`       // non-empty when the call failed
+	Result     any    `json:"result,omitempty"`     // redacted before leaving the control boundary
+	ArgsRef    string `json:"args_ref,omitempty"`   // safe reference to the raw args
+	ResultRef  string `json:"result_ref,omitempty"` // safe reference to the raw result
+	Capability string `json:"capability,omitempty"` // risk-class key (e.g. "shell", "read_secret")
+	RiskClass  string `json:"risk_class,omitempty"` // resolved risk classification
+	Error      string `json:"error,omitempty"`      // non-empty when the call failed
 }
 
 // Evaluation records the policy engine's reasoning (diagnostic only).
@@ -108,17 +109,17 @@ type Evaluation struct {
 
 // ActionEvent is the versioned, immutable record of one policy-relevant action.
 type ActionEvent struct {
-	ID           string         `json:"id"`
-	SchemaVer    int            `json:"schema_version"`
-	Source       SourceType     `json:"source"`
-	PrevEventID  string         `json:"prev_event_id,omitempty"` // chain for audit log
-	Agent        AgentIdentity  `json:"agent"`
-	Client       ClientIdentity `json:"client,omitempty"`
-	Call         ToolCall       `json:"call"`
-	State        ActionState    `json:"state"`
-	Evaluation   *Evaluation    `json:"evaluation,omitempty"`   // diagnostic only
-	ControlResp  *ControlResponse `json:"control_response,omitempty"`
-	Timestamp    string         `json:"timestamp"`              // RFC 3339
+	ID          string           `json:"id"`
+	SchemaVer   int              `json:"schema_version"`
+	Source      SourceType       `json:"source"`
+	PrevEventID string           `json:"prev_event_id,omitempty"` // chain for audit log
+	Agent       AgentIdentity    `json:"agent"`
+	Client      ClientIdentity   `json:"client,omitempty"`
+	Call        ToolCall         `json:"call"`
+	State       ActionState      `json:"state"`
+	Evaluation  *Evaluation      `json:"evaluation,omitempty"` // diagnostic only
+	ControlResp *ControlResponse `json:"control_response,omitempty"`
+	Timestamp   string           `json:"timestamp"` // RFC 3339
 }
 
 // ControlResponse is the immediate action the runtime should take.
@@ -157,7 +158,7 @@ func ValidateState(s ActionState) error {
 // ValidateDecision returns an error if the decision value is unrecognized.
 func ValidateDecision(d Decision) error {
 	switch d {
-	case DecisionAllow, DecisionAsk, DecisionDeny,
+	case DecisionAllow, DecisionAsk, DecisionDeny, DecisionRequire,
 		DecisionRedact, DecisionReadOnly, DecisionSandbox:
 		return nil
 	}
