@@ -5,6 +5,8 @@
 //	model → output
 //	config → (standalone, consumed by all)
 //	discovery → (standalone, consumed by scan command)
+//	capability → (standalone leaf, consumed by CLI and future MCP proxy;
+//	its scope ceiling helper lives in policy, which must not import it)
 //
 // No package in a higher plane may import a package from a lower plane
 // (e.g. audit must not import policy). Utility packages (config, discovery,
@@ -31,14 +33,15 @@ type AllowedImports map[string]map[string]bool
 
 // DefaultAllowed defines the canonical dependency graph.
 var DefaultAllowed = AllowedImports{
-	"model":     {},
-	"policy":    {"model": true},
-	"approval":  {"model": true},
-	"audit":     {"model": true},
-	"output":    {},
-	"config":    {},
-	"discovery": {"config": true},
-	"update":    {},
+	"model":      {},
+	"policy":     {"model": true},
+	"approval":   {"model": true},
+	"audit":      {"model": true},
+	"output":     {},
+	"config":     {},
+	"discovery":  {"config": true},
+	"update":     {},
+	"capability": {},
 }
 
 // Check returns a list of violations where an internal package imports
