@@ -19,9 +19,30 @@
 // expression, matched rule, evaluation trace) belongs in the ActionEvent's
 // Evaluation field and is written to stderr or the audit sink, never to
 // stdout in MCP transport mode.
+//
+// # Fail-closed decision contract
+//
+// DecisionRequest carries the two fields that make an external decision
+// call fail closed by construction. FailureMode is a typed failure mode
+// whose zero value and any unrecognized value resolve to deny — matching
+// the fail-closed convention documented in internal/config, where an
+// unrecognized decision is rejected rather than implicitly allowed; only
+// an explicitly configured FailureModeAllow resolves to allow. Deadline
+// bounds how long a decision may take: once it passes, the request is
+// expired and the outcome is a non-decision, never a stale decision.
+//
+// Every non-decision outcome — deadline expiry, transport error, malformed
+// response — is produced by the single NewNoDecision constructor. Its
+// Control is an explicit deny, indistinguishable in shape from a policy
+// deny; the reason a decision was not produced lives only in the
+// Diagnostic field, so callers cannot accidentally distinguish "denied"
+// from "unavailable" in a permissive direction.
 package model
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 // SchemaVersion is the current version of the ActionEvent schema.
 // Increment on any backward-incompatible change; additive changes are
@@ -73,6 +94,30 @@ const (
 	DecisionSandbox  Decision = "sandbox"
 )
 
+// FailureMode is a typed failure mode for decision requests.
+// The zero value and any unrecognized value resolve to deny (fail
+// closed); only an explicitly configured FailureModeAllow resolves to
+// allow. See the package doc's "Fail-closed decision contract" section.
+type FailureMode string
+
+const (
+	// FailureModeDeny is the zero value: when a decision cannot be
+	// produced, the outcome is deny.
+	FailureModeDeny FailureMode = "deny"
+	// FailureModeAllow is an explicit, deliberate opt-in to fail open.
+	FailureModeAllow FailureMode = "allow"
+)
+
+// Resolve returns the decision for a failure. Unset and unrecognized
+// values resolve to deny; only an explicitly configured allow resolves
+// to allow.
+func (f FailureMode) Resolve() Decision {
+	if f == FailureModeAllow {
+		return DecisionAllow
+	}
+	return DecisionDeny
+}
+
 // AgentIdentity identifies the calling agent or client.
 type AgentIdentity struct {
 	AgentID   string `json:"agent_id"`
@@ -97,6 +142,22 @@ type ToolCall struct {
 	Capability string `json:"capability,omitempty"` // risk-class key (e.g. "shell", "read_secret")
 	RiskClass  string `json:"risk_class,omitempty"` // resolved risk classification
 	Error      string `json:"error,omitempty"`      // non-empty when the call failed
+}
+
+// DecisionRequest asks for a policy decision on a tool call and carries
+// the fail-closed contract for the request.
+type DecisionRequest struct {
+	Call     ToolCall    `json:"call"`
+	Failure  FailureMode `json:"failure_mode,omitempty"`
+	Deadline time.Time   `json:"deadline,omitempty"` // RFC 3339; zero means no deadline
+}
+
+// Expired reports whether the deadline has passed at the given time.
+// A zero Deadline never expires. When a request expires, its outcome is a
+// non-decision: the transport MUST answer with NewNoDecision (fail
+// closed), never with a stale decision.
+func (r DecisionRequest) Expired(now time.Time) bool {
+	return !r.Deadline.IsZero() && !now.Before(r.Deadline)
 }
 
 // Evaluation records the policy engine's reasoning (diagnostic only).
@@ -128,6 +189,34 @@ type ControlResponse struct {
 	Decision   Decision `json:"decision"`
 	Reason     string   `json:"reason,omitempty"`      // user-facing, safe
 	RetryAfter int      `json:"retry_after,omitempty"` // seconds
+}
+
+// NoDecision is the outcome of a decision request that did not produce a
+// decision: deadline expiry, transport error, or malformed response.
+// Control is always an explicit deny — indistinguishable in shape from a
+// policy deny — so a caller cannot accidentally distinguish "denied"
+// from "unavailable" in a permissive direction. Diagnostic explains why
+// the decision was not produced and belongs in the ActionEvent's
+// Evaluation field (the diagnostic side of the control/diagnostic
+// separation), never in Control.
+type NoDecision struct {
+	Control    *ControlResponse
+	Diagnostic string
+}
+
+// NewNoDecision is the single constructor for every non-decision outcome
+// of a decision request. Every error path — deadline expiry, transport
+// error, malformed response — MUST use it, so an outage and a deny
+// produce the same observable outcome. The failure mode resolves the
+// control decision: the default FailureModeDeny yields an explicit deny;
+// only an explicitly configured FailureModeAllow yields an allow. The
+// Control's Reason is left empty so the control path carries no signal
+// that distinguishes unavailability from a deny.
+func NewNoDecision(failure FailureMode, diagnostic string) NoDecision {
+	return NoDecision{
+		Control:    &ControlResponse{Decision: failure.Resolve()},
+		Diagnostic: diagnostic,
+	}
 }
 
 // EventID generates a stable, locally unique event ID.
