@@ -85,8 +85,11 @@ func TestRun_Doctor(t *testing.T) {
 	if !strings.Contains(out, "Version:") {
 		t.Error("expected version in doctor output")
 	}
-	if !strings.Contains(out, "All basic checks passed") {
-		t.Error("expected completion message")
+	// Doctor's verdict depends on the host environment: a machine with
+	// discovered MCP servers and no spawn allowlist reports issues, a clean
+	// machine reports all clear.
+	if !strings.Contains(out, "All basic checks passed") && !strings.Contains(out, "issue(s) found") {
+		t.Error("expected completion message or issue summary")
 	}
 }
 
