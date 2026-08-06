@@ -18,7 +18,10 @@
 // allow, deny, ask, or a passthrough signal. All diagnostic context (rule
 // expression, matched rule, evaluation trace) belongs in the ActionEvent's
 // Evaluation field and is written to stderr or the audit sink, never to
-// stdout in MCP transport mode.
+// stdout in MCP transport mode. The optional per-rule trace
+// (Evaluation.RuleTrace) follows the same rule: it is diagnostic only,
+// populated only when the policy engine is explicitly asked to trace, and
+// never appears in ControlResponse.
 //
 // # Fail-closed decision contract
 //
@@ -160,12 +163,24 @@ func (r DecisionRequest) Expired(now time.Time) bool {
 	return !r.Deadline.IsZero() && !now.Before(r.Deadline)
 }
 
+// RuleTraceEntry records one rule's evaluation for the optional per-rule
+// trace. Diagnostic only; populated exclusively by the policy engine when
+// tracing is explicitly enabled. Bucket is one of "deny", "allow", or
+// "require".
+type RuleTraceEntry struct {
+	RuleID   string   `json:"rule_id"`
+	Matched  bool     `json:"matched"`
+	Decision Decision `json:"decision"`
+	Bucket   string   `json:"bucket"`
+}
+
 // Evaluation records the policy engine's reasoning (diagnostic only).
 type Evaluation struct {
-	MatchedRule   string   `json:"matched_rule,omitempty"`
-	Decision      Decision `json:"decision"`
-	Reason        string   `json:"reason,omitempty"`
-	MarginalCheck bool     `json:"marginal_check,omitempty"`
+	MatchedRule   string           `json:"matched_rule,omitempty"`
+	Decision      Decision         `json:"decision"`
+	Reason        string           `json:"reason,omitempty"`
+	MarginalCheck bool             `json:"marginal_check,omitempty"`
+	RuleTrace     []RuleTraceEntry `json:"rule_trace,omitempty"` // diagnostic only; empty unless tracing is enabled
 }
 
 // ActionEvent is the versioned, immutable record of one policy-relevant action.

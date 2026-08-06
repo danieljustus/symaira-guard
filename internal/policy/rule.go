@@ -90,12 +90,21 @@ const (
 
 // Result is the structured outcome of a policy evaluation.
 type Result struct {
-	Rule       *Rule          `json:"rule,omitempty"`
-	Decision   model.Decision `json:"decision"`
-	Reason     string         `json:"reason,omitempty"`
-	Matched    bool           `json:"matched"`
-	Precedence Precedence     `json:"precedence,omitempty"`
-	Bucket     Bucket         `json:"bucket,omitempty"`
+	Rule       *Rule                  `json:"rule,omitempty"`
+	Decision   model.Decision         `json:"decision"`
+	Reason     string                 `json:"reason,omitempty"`
+	Matched    bool                   `json:"matched"`
+	Precedence Precedence             `json:"precedence,omitempty"`
+	Bucket     Bucket                 `json:"bucket,omitempty"`
+	Trace      []model.RuleTraceEntry `json:"trace,omitempty"` // diagnostic only; populated only when Options.Trace is set
+}
+
+// Options controls catalog evaluation.
+type Options struct {
+	// Trace records one entry per rule in Result.Trace, in catalog order,
+	// with the rule's matched state, decision, and bucket. Diagnostic
+	// only: tracing never changes the decision. Off by default.
+	Trace bool
 }
 
 // Catalog is a versioned, validated collection of rules.
@@ -109,9 +118,21 @@ type Catalog struct {
 // require, allow (see the package doc for the full semantics): any
 // matching deny wins regardless of position or precedence; every require
 // rule must hold; otherwise the first matching rule in the allow bucket
-// (or the provided default) decides. Returns the default decision from
-// the provided Defaults if no rule matches.
+// (or the provided default) decides. Tracing is off; use EvaluateOpts
+// with Options{Trace: true} to collect the per-rule trace.
 func (c *Catalog) Evaluate(call model.ToolCall, defaults model.Decision) Result {
+	return c.EvaluateOpts(call, defaults, Options{})
+}
+
+// EvaluateOpts is Evaluate with explicit options. When opts.Trace is set,
+// Result.Trace lists every rule in the catalog exactly once, in catalog
+// order, with its matched state, decision, and bucket. Tracing is
+// diagnostic only and never changes the decision.
+func (c *Catalog) EvaluateOpts(call model.ToolCall, defaults model.Decision, opts Options) Result {
+	var trace []model.RuleTraceEntry
+	if opts.Trace {
+		trace = make([]model.RuleTraceEntry, 0, len(c.Rules))
+	}
 	var (
 		denyRule   *Rule // first matching deny in precedence order
 		denyErr    *Rule // first deny that could not be evaluated
@@ -121,9 +142,18 @@ func (c *Catalog) Evaluate(call model.ToolCall, defaults model.Decision) Result 
 	)
 	for i := range c.Rules {
 		r := &c.Rules[i]
-		switch bucketOf(r.Decision) {
+		bucket := bucketOf(r.Decision)
+		matched, err := matches(r.Match, call)
+		if opts.Trace {
+			trace = append(trace, model.RuleTraceEntry{
+				RuleID:   string(r.ID),
+				Matched:  matched,
+				Decision: r.Decision,
+				Bucket:   string(bucket),
+			})
+		}
+		switch bucket {
 		case BucketDeny:
-			matched, err := matches(r.Match, call)
 			switch {
 			case err != nil:
 				// Defensive deny: an unevaluable deny rule never resolves
@@ -137,7 +167,6 @@ func (c *Catalog) Evaluate(call model.ToolCall, defaults model.Decision) Result 
 				}
 			}
 		case BucketRequire:
-			matched, err := matches(r.Match, call)
 			switch {
 			case err != nil:
 				if requireErr == nil {
@@ -149,7 +178,6 @@ func (c *Catalog) Evaluate(call model.ToolCall, defaults model.Decision) Result 
 				}
 			}
 		case BucketAllow:
-			matched, err := matches(r.Match, call)
 			if err != nil {
 				// An unevaluable allow rule never grants; skip it.
 				continue
@@ -169,6 +197,7 @@ func (c *Catalog) Evaluate(call model.ToolCall, defaults model.Decision) Result 
 			Matched:    true,
 			Precedence: denyRule.Precedence,
 			Bucket:     BucketDeny,
+			Trace:      trace,
 		}
 	case denyErr != nil:
 		return Result{
@@ -178,6 +207,7 @@ func (c *Catalog) Evaluate(call model.ToolCall, defaults model.Decision) Result 
 			Matched:    false,
 			Precedence: denyErr.Precedence,
 			Bucket:     BucketDeny,
+			Trace:      trace,
 		}
 	case requireBad != nil:
 		return Result{
@@ -187,6 +217,7 @@ func (c *Catalog) Evaluate(call model.ToolCall, defaults model.Decision) Result 
 			Matched:    false,
 			Precedence: requireBad.Precedence,
 			Bucket:     BucketRequire,
+			Trace:      trace,
 		}
 	case requireErr != nil:
 		return Result{
@@ -196,6 +227,7 @@ func (c *Catalog) Evaluate(call model.ToolCall, defaults model.Decision) Result 
 			Matched:    false,
 			Precedence: requireErr.Precedence,
 			Bucket:     BucketRequire,
+			Trace:      trace,
 		}
 	case allowMatch != nil:
 		return Result{
@@ -205,12 +237,14 @@ func (c *Catalog) Evaluate(call model.ToolCall, defaults model.Decision) Result 
 			Matched:    true,
 			Precedence: allowMatch.Precedence,
 			Bucket:     BucketAllow,
+			Trace:      trace,
 		}
 	default:
 		return Result{
 			Decision: defaults,
 			Reason:   "default capability decision",
 			Matched:  false,
+			Trace:    trace,
 		}
 	}
 }

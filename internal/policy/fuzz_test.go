@@ -35,5 +35,6 @@ func FuzzEvaluate(f *testing.F) {
 			Args:       server, // use string args for CommandContains matching
 		}
 		_ = c.Evaluate(call, model.DecisionAllow)
+		_ = c.EvaluateOpts(call, model.DecisionAllow, Options{Trace: true})
 	})
 }
