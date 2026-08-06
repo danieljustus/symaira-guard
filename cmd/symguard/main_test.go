@@ -106,6 +106,9 @@ func TestPrintUsage(t *testing.T) {
 	if !strings.Contains(out, "doctor") {
 		t.Error("expected 'doctor' in usage")
 	}
+	if !strings.Contains(out, "decide") {
+		t.Error("expected 'decide' in usage")
+	}
 }
 
 func TestCmdVersion(t *testing.T) {
@@ -132,6 +135,17 @@ func TestCmdDoctor(t *testing.T) {
 	}
 	if !strings.Contains(out, "config") {
 		t.Error("expected 'config' check")
+	}
+}
+
+func TestRun_DecideHelp(t *testing.T) {
+	var buf bytes.Buffer
+	code := run([]string{"decide", "--help"}, &buf)
+	if code != 0 {
+		t.Errorf("expected exit code 0, got %d", code)
+	}
+	if !strings.Contains(buf.String(), "symguard decide") {
+		t.Error("expected decide usage output")
 	}
 }
 

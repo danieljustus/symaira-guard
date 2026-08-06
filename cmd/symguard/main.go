@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/danieljustus/symaira-guard/cmd/symguard/decide"
 	"github.com/danieljustus/symaira-guard/cmd/symguard/doctor"
 	"github.com/danieljustus/symaira-guard/cmd/symguard/version"
 )
@@ -33,6 +34,8 @@ func run(args []string, w io.Writer) int {
 		version.Run(args[1:], w)
 	case "doctor":
 		doctor.Run(w)
+	case "decide":
+		decide.Run(args[1:], os.Stdin, w, nil)
 	case "help", "--help", "-h":
 		printUsage(w)
 	default:
@@ -56,6 +59,7 @@ Usage:
 Commands:
   version   Print version and build info
   doctor    Check system health and configuration
+  decide    Read a JSON decision request from stdin, write the decision to stdout
   help      Show this help message
 
 Run 'symguard <command> --help' for details on a specific command.`)

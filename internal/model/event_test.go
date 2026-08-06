@@ -27,6 +27,7 @@ func TestValidateSource(t *testing.T) {
 		{"hook", SourceHook, false},
 		{"artifact", SourceArtifact, false},
 		{"scan", SourceScan, false},
+		{"decide", SourceDecide, false},
 		{"unknown", SourceType("unknown"), true},
 		{"empty", SourceType(""), true},
 	}

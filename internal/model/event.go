@@ -60,6 +60,7 @@ const (
 	SourceHook     SourceType = "hook"     // Pre/post execution hook
 	SourceArtifact SourceType = "artifact" // Declared tool or script output
 	SourceScan     SourceType = "scan"     // Offline tool-scanning report
+	SourceDecide   SourceType = "decide"   // External classifier decision interface (symguard decide)
 )
 
 // ActionState describes the lifecycle phase of a tool call.
@@ -243,7 +244,7 @@ func EventID(source SourceType, counter int64) string {
 // ValidateSource returns an error if the source type is unrecognized.
 func ValidateSource(s SourceType) error {
 	switch s {
-	case SourceProxy, SourceHook, SourceArtifact, SourceScan:
+	case SourceProxy, SourceHook, SourceArtifact, SourceScan, SourceDecide:
 		return nil
 	}
 	return fmt.Errorf("model: unknown source type %q", s)
