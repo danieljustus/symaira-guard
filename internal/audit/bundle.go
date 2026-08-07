@@ -59,6 +59,18 @@ type Decision struct {
 	DecidedAt string `json:"decided_at"` // RFC 3339
 }
 
+// ProposalApplied is a portable audit record for an applied policy
+// proposal. It is the proposal counterpart of Decision: it identifies
+// the resulting rule and the human who applied it, so a rule's
+// provenance can be traced through the audit chain.
+type ProposalApplied struct {
+	ProposalID string `json:"proposal_id"`
+	Action     string `json:"action"`     // "set" or "delete"
+	Rule       string `json:"rule"`       // canonical JSON of the resulting rule
+	AppliedBy  string `json:"applied_by"` // human who applied the proposal
+	AppliedAt  string `json:"applied_at"` // RFC 3339
+}
+
 // ExternalDecision is the audit record for one decision produced by the
 // external classifier interface (`symguard decide`, issue #81): the
 // request fields that were evaluated, the resulting decision

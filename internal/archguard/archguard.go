@@ -2,6 +2,7 @@
 // internal packages. The intended dependency planes are:
 //
 //	model → policy → approval → audit
+//	proposal → model, config, audit (approval layer: persisted policy changes)
 //	model → output
 //	config → (standalone, consumed by all)
 //	grant → (standalone leaf, consumed by approval and policy)
@@ -35,6 +36,7 @@ var DefaultAllowed = AllowedImports{
 	"model":     {},
 	"policy":    {"model": true, "grant": true},
 	"approval":  {"model": true, "grant": true},
+	"proposal":  {"model": true, "config": true, "audit": true},
 	"audit":     {"model": true},
 	"output":    {},
 	"config":    {},
