@@ -2,6 +2,7 @@
 // internal packages. The intended dependency planes are:
 //
 //	model → policy → approval → audit
+//	model → sequence → policy
 //	proposal → model, config, audit (approval layer: persisted policy changes)
 //	model → output
 //	config → (standalone, consumed by all)
@@ -36,7 +37,8 @@ type AllowedImports map[string]map[string]bool
 // DefaultAllowed defines the canonical dependency graph.
 var DefaultAllowed = AllowedImports{
 	"model":      {},
-	"policy":     {"model": true, "grant": true},
+	"policy":     {"model": true, "grant": true, "sequence": true},
+	"sequence":   {"model": true},
 	"approval":   {"model": true, "grant": true},
 	"proposal":   {"model": true, "config": true, "audit": true},
 	"audit":      {"model": true},

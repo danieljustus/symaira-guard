@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -269,6 +270,80 @@ func TestLoad_OS_InvalidTOML(t *testing.T) {
 	_, err := Load()
 	if err == nil {
 		t.Fatal("Load() with invalid TOML: expected error, got nil")
+	}
+}
+
+func TestDefaultConfig_SequenceDisabledByDefault(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.Sequence.Enabled {
+		t.Error("sequence must be disabled by default")
+	}
+	if cfg.Sequence.Threshold != 3 {
+		t.Errorf("default sequence threshold = %d, want 3", cfg.Sequence.Threshold)
+	}
+}
+
+func TestLoad_SequenceEnabledDefaultsThreshold(t *testing.T) {
+	path := writeTempConfig(t, `
+[sequence]
+enabled = true
+`)
+	cfg, err := LoadFrom(path)
+	if err != nil {
+		t.Fatalf("LoadFrom: %v", err)
+	}
+	if !cfg.Sequence.Enabled {
+		t.Error("sequence should be enabled")
+	}
+	if cfg.Sequence.Threshold != 3 {
+		t.Errorf("threshold = %d, want default 3", cfg.Sequence.Threshold)
+	}
+}
+
+func TestLoad_SequenceThresholdZeroDefaults(t *testing.T) {
+	path := writeTempConfig(t, `
+[sequence]
+enabled = true
+threshold = 0
+`)
+	cfg, err := LoadFrom(path)
+	if err != nil {
+		t.Fatalf("LoadFrom: %v", err)
+	}
+	if cfg.Sequence.Threshold != 3 {
+		t.Errorf("threshold = %d, want default 3", cfg.Sequence.Threshold)
+	}
+}
+
+func TestLoad_SequenceConfiguredThreshold(t *testing.T) {
+	path := writeTempConfig(t, `
+[sequence]
+enabled = true
+threshold = 5
+`)
+	cfg, err := LoadFrom(path)
+	if err != nil {
+		t.Fatalf("LoadFrom: %v", err)
+	}
+	if !cfg.Sequence.Enabled {
+		t.Error("sequence should be enabled")
+	}
+	if cfg.Sequence.Threshold != 5 {
+		t.Errorf("threshold = %d, want 5", cfg.Sequence.Threshold)
+	}
+}
+
+func TestLoad_SequenceInvalidThreshold(t *testing.T) {
+	for _, th := range []int{1, -2} {
+		path := writeTempConfig(t, fmt.Sprintf(`
+[sequence]
+enabled = true
+threshold = %d
+`, th))
+		_, err := LoadFrom(path)
+		if err == nil {
+			t.Errorf("threshold %d: expected error, got nil", th)
+		}
 	}
 }
 

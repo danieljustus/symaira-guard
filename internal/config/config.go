@@ -87,6 +87,15 @@ type RemoteTarget struct {
 	Labels         []string `toml:"labels,omitempty"`
 }
 
+// SequenceConfig enables the optional stateful repetition detector
+// (internal/sequence). It is off by default so symguard stays stateless
+// unless explicitly opted in. Threshold is the in-window call count that
+// blocks a repeated tool+input signature (0 or absent resolves to 3).
+type SequenceConfig struct {
+	Enabled   bool `toml:"enabled,omitempty"`
+	Threshold int  `toml:"threshold,omitempty"`
+}
+
 // SpawnEntry is a single allowlisted stdio MCP server launch. Path is the
 // absolute path of the executable; ArgvPrefix optionally constrains the
 // leading arguments the server may be launched with. An empty ArgvPrefix
@@ -109,6 +118,7 @@ type Config struct {
 	Proxy    ProxyConfig    `toml:"proxy"`
 	Audit    AuditConfig    `toml:"audit"`
 	Remote   []RemoteTarget `toml:"remote"`
+	Sequence SequenceConfig `toml:"sequence"`
 	Spawn    SpawnConfig    `toml:"spawn"`
 }
 
@@ -128,7 +138,11 @@ func DefaultConfig() *Config {
 			Path: "symguard-audit.log",
 		},
 		Remote: nil,
-		Spawn:  SpawnConfig{},
+		Sequence: SequenceConfig{
+			Enabled:   false, // opt-in: stateless by default
+			Threshold: 3,
+		},
+		Spawn: SpawnConfig{},
 	}
 }
 
@@ -205,6 +219,13 @@ func validate(cfg *Config) error {
 		Allow: true, Ask: true, Deny: true, Redact: true, ReadOnly: true, Sandbox: true,
 	}
 
+	// An omitted [sequence] threshold decodes to 0; resolve it to the
+	// documented default before validation so explicit invalid values
+	// (1, negative) stay distinguishable.
+	if cfg.Sequence.Enabled && cfg.Sequence.Threshold == 0 {
+		cfg.Sequence.Threshold = 3
+	}
+
 	for cap, d := range cfg.Defaults {
 		if !validDecisions[d] {
 			return fmt.Errorf("defaults.%q: invalid decision %q (allowed: allow, ask, deny, redact, readonly, sandbox)", cap, d)
@@ -220,6 +241,9 @@ func validate(cfg *Config) error {
 		}
 	}
 
+	if cfg.Sequence.Enabled && cfg.Sequence.Threshold < 2 {
+		return fmt.Errorf("sequence.threshold: must be at least 2 when sequence is enabled (got %d)", cfg.Sequence.Threshold)
+	}
 	for i, entry := range cfg.Spawn.Allowlist {
 		if entry.Path == "" {
 			return fmt.Errorf("spawn.allowlist[%d]: path is required", i)
