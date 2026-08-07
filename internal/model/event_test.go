@@ -27,6 +27,7 @@ func TestValidateSource(t *testing.T) {
 		{"hook", SourceHook, false},
 		{"artifact", SourceArtifact, false},
 		{"scan", SourceScan, false},
+		{"decide", SourceDecide, false},
 		{"unknown", SourceType("unknown"), true},
 		{"empty", SourceType(""), true},
 	}
@@ -74,6 +75,7 @@ func TestValidateDecision(t *testing.T) {
 		{"allow", DecisionAllow, false},
 		{"ask", DecisionAsk, false},
 		{"deny", DecisionDeny, false},
+		{"require", DecisionRequire, false},
 		{"redact", DecisionRedact, false},
 		{"readonly", DecisionReadOnly, false},
 		{"sandbox", DecisionSandbox, false},

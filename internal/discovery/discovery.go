@@ -4,8 +4,9 @@
 //
 // Each client stores MCP configuration in a JSON file at a known location.
 // Discovery reads those files, parses the client-specific format, and
-// normalises servers into a common [Server] representation. Missing config
-// files are silently skipped.
+// normalises servers into a common [Server] representation. [ScanAll]
+// reports every source that cannot be mapped as a [Finding]; the legacy
+// [DiscoverAll] and [ParseClient] helpers still skip missing files silently.
 package discovery
 
 import (
@@ -30,11 +31,11 @@ const (
 type Client string
 
 const (
-	ClientHermes       Client = "hermes"
+	ClientHermes        Client = "hermes"
 	ClientClaudeDesktop Client = "claude-desktop"
-	ClientCursor       Client = "cursor"
-	ClientVSCode       Client = "vscode"
-	ClientOpenCode     Client = "opencode"
+	ClientCursor        Client = "cursor"
+	ClientVSCode        Client = "vscode"
+	ClientOpenCode      Client = "opencode"
 )
 
 // Server is the normalised representation of a single MCP server entry
@@ -163,6 +164,8 @@ func ParseClient(client Client, path string) ([]Server, error) {
 }
 
 // ParseClientWithFS is like [ParseClient] but uses the provided [FS].
+// Findings produced while parsing are discarded; use [ScanAllWithFS] when
+// every unmappable source must be reported.
 func ParseClientWithFS(fsys FS, client Client, path string) ([]Server, error) {
 	data, err := fsys.ReadFile(path)
 	if err != nil {
@@ -172,14 +175,11 @@ func ParseClientWithFS(fsys FS, client Client, path string) ([]Server, error) {
 		return nil, fmt.Errorf("discovery: read %s config %s: %w", client, path, err)
 	}
 
-	switch client {
-	case ClientHermes, ClientClaudeDesktop, ClientCursor, ClientVSCode:
-		return parseMCPserversFormat(client, data)
-	case ClientOpenCode:
-		return parseOpenCodeFormat(client, data)
-	default:
-		return nil, fmt.Errorf("discovery: unsupported client %q", client)
+	servers, _, err := parseClientData(client, path, data)
+	if err != nil {
+		return nil, fmt.Errorf("discovery: parse %s config: %w", client, err)
 	}
+	return servers, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -200,20 +200,23 @@ type rawServer struct {
 	Env     map[string]string `json:"env"`
 }
 
-func parseMCPserversFormat(client Client, data []byte) ([]Server, error) {
+func parseMCPserversFormat(client Client, path string, data []byte) ([]Server, []Finding, error) {
 	var cfg rawConfig
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("discovery: parse %s config: %w", client, err)
+		return nil, nil, err
 	}
-	return rawServersToServers(client, cfg.MCPServers), nil
+	servers, findings := rawServersToServers(client, path, cfg.MCPServers)
+	return servers, findings, nil
 }
 
 // rawServersToServers normalises a raw mcpServers map into Server values.
-func rawServersToServers(client Client, raw map[string]rawServer) []Server {
+// Entries that cannot be mapped (neither command nor url) become findings.
+func rawServersToServers(client Client, path string, raw map[string]rawServer) ([]Server, []Finding) {
 	if len(raw) == 0 {
-		return nil
+		return nil, nil
 	}
 	servers := make([]Server, 0, len(raw))
+	var findings []Finding
 	for name, rs := range raw {
 		s := Server{
 			Name:    name,
@@ -232,6 +235,18 @@ func rawServersToServers(client Client, raw map[string]rawServer) []Server {
 			s.Transport = TransportStdio
 		}
 
+		// An entry with neither a command nor a URL cannot be launched or
+		// connected — report it instead of silently skipping it.
+		if s.Command == "" {
+			findings = append(findings, Finding{
+				Client:  client,
+				Path:    path,
+				Status:  StatusUnsupported,
+				Message: fmt.Sprintf("server %q is missing both command and url", name),
+			})
+			continue
+		}
+
 		// Env vars — preserve keys, redact values.
 		if len(rs.Env) > 0 {
 			s.EnvKeys = make([]string, 0, len(rs.Env))
@@ -244,7 +259,7 @@ func rawServersToServers(client Client, raw map[string]rawServer) []Server {
 
 		servers = append(servers, s)
 	}
-	return servers
+	return servers, findings
 }
 
 // ---------------------------------------------------------------------------
@@ -266,16 +281,17 @@ type openCodeServer struct {
 	Env         map[string]string `json:"env"`         // some versions may use "env"
 }
 
-func parseOpenCodeFormat(client Client, data []byte) ([]Server, error) {
+func parseOpenCodeFormat(client Client, path string, data []byte) ([]Server, []Finding, error) {
 	var cfg openCodeConfig
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("discovery: parse %s config: %w", client, err)
+		return nil, nil, err
 	}
 	if len(cfg.MCP) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	servers := make([]Server, 0, len(cfg.MCP))
+	var findings []Finding
 	for name, oc := range cfg.MCP {
 		s := Server{
 			Name:   name,
@@ -287,11 +303,49 @@ func parseOpenCodeFormat(client Client, data []byte) ([]Server, error) {
 		case "remote":
 			s.Transport = TransportHTTP
 			s.Command = oc.URL
-		default:
+			if s.Command == "" {
+				findings = append(findings, Finding{
+					Client:  client,
+					Path:    path,
+					Status:  StatusUnsupported,
+					Message: fmt.Sprintf("server %q is remote but has no url", name),
+				})
+				continue
+			}
+		case "local", "":
 			// "local" or unspecified — default to stdio.
 			s.Transport = TransportStdio
 			s.Command = oc.Command
 			s.Args = oc.Args
+			if s.Command == "" {
+				findings = append(findings, Finding{
+					Client:  client,
+					Path:    path,
+					Status:  StatusUnsupported,
+					Message: fmt.Sprintf("server %q is local but has no command", name),
+				})
+				continue
+			}
+		default:
+			// Unknown type — try stdio, but flag the guess as approximate.
+			s.Transport = TransportStdio
+			s.Command = oc.Command
+			s.Args = oc.Args
+			if s.Command == "" {
+				findings = append(findings, Finding{
+					Client:  client,
+					Path:    path,
+					Status:  StatusUnsupported,
+					Message: fmt.Sprintf("server %q has unknown type %q and no command", name, oc.Type),
+				})
+				continue
+			}
+			findings = append(findings, Finding{
+				Client:  client,
+				Path:    path,
+				Status:  StatusApproximate,
+				Message: fmt.Sprintf("server %q has unknown type %q, treated as local", name, oc.Type),
+			})
 		}
 
 		// Merge env from both "environment" and "env" keys (some versions differ).
@@ -307,7 +361,7 @@ func parseOpenCodeFormat(client Client, data []byte) ([]Server, error) {
 
 		servers = append(servers, s)
 	}
-	return servers, nil
+	return servers, findings, nil
 }
 
 // mergeEnvMaps combines two env maps. If both contain the same key, primary wins.
@@ -347,5 +401,3 @@ func (s Server) String() string {
 	}
 	return b.String()
 }
-
-

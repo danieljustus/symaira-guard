@@ -71,6 +71,23 @@ type ProposalApplied struct {
 	AppliedAt  string `json:"applied_at"` // RFC 3339
 }
 
+// ExternalDecision is the audit record for one decision produced by the
+// external classifier interface (`symguard decide`, issue #81): the
+// request fields that were evaluated, the resulting decision
+// (allow|confirm|deny), and the reason. A concrete hash-chained sink for
+// records like this is Phase 3 wiring; the emitting package consumes the
+// record through its own small Sink interface.
+type ExternalDecision struct {
+	ID        string   `json:"id"`
+	Command   string   `json:"command"`
+	RiskClass string   `json:"risk_class,omitempty"`
+	Domain    string   `json:"domain,omitempty"`
+	Warnings  []string `json:"warnings,omitempty"`
+	Decision  string   `json:"decision"` // allow|confirm|deny
+	Reason    string   `json:"reason,omitempty"`
+	DecidedAt string   `json:"decided_at"` // RFC 3339
+}
+
 // NewManifest creates a manifest with default values for the current schema.
 func NewManifest(caseID string) Manifest {
 	return Manifest{
