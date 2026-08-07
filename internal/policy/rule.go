@@ -12,6 +12,7 @@ package policy
 import (
 	"fmt"
 
+	"github.com/danieljustus/symaira-guard/internal/grant"
 	"github.com/danieljustus/symaira-guard/internal/model"
 )
 
@@ -26,13 +27,13 @@ type Precedence int
 
 // Rule is a single policy rule with stable identity and deterministic ordering.
 type Rule struct {
-	ID          RuleID          `json:"id"`
-	Version     Version         `json:"version"`
-	Precedence  Precedence      `json:"precedence"`
-	Decision    model.Decision  `json:"decision"`
-	Match       MatchCriteria   `json:"match"`
-	Reason      string          `json:"reason,omitempty"`
-	ObserveOnly bool            `json:"observe_only,omitempty"`
+	ID          RuleID         `json:"id"`
+	Version     Version        `json:"version"`
+	Precedence  Precedence     `json:"precedence"`
+	Decision    model.Decision `json:"decision"`
+	Match       MatchCriteria  `json:"match"`
+	Reason      string         `json:"reason,omitempty"`
+	ObserveOnly bool           `json:"observe_only,omitempty"`
 }
 
 // MatchCriteria defines what a rule matches against.
@@ -47,17 +48,17 @@ type MatchCriteria struct {
 
 // Result is the structured outcome of a policy evaluation.
 type Result struct {
-	Rule        *Rule           `json:"rule,omitempty"`
-	Decision    model.Decision  `json:"decision"`
-	Reason      string          `json:"reason,omitempty"`
-	Matched     bool            `json:"matched"`
-	Precedence  Precedence      `json:"precedence,omitempty"`
+	Rule       *Rule          `json:"rule,omitempty"`
+	Decision   model.Decision `json:"decision"`
+	Reason     string         `json:"reason,omitempty"`
+	Matched    bool           `json:"matched"`
+	Precedence Precedence     `json:"precedence,omitempty"`
 }
 
 // Catalog is a versioned, validated collection of rules.
 type Catalog struct {
-	Rules      []Rule   `json:"rules"`
-	Version    Version  `json:"version"`
+	Rules   []Rule  `json:"rules"`
+	Version Version `json:"version"`
 }
 
 // Evaluate checks a tool call against the catalog and returns the
@@ -79,6 +80,34 @@ func (c *Catalog) Evaluate(call model.ToolCall, defaults model.Decision) Result 
 		Decision: defaults,
 		Reason:   "default capability decision",
 		Matched:  false,
+	}
+}
+
+// GrantLookup reports the active grants held by a subject. It is the policy
+// engine's read seam into the grant store (internal/grant).
+type GrantLookup interface {
+	ActiveForSubject(subject string) []*grant.Grant
+}
+
+// EvaluateWithGrants evaluates a tool call and consults the grant store:
+// when the static result would ask the human and the subject holds at least
+// one active grant, the decision is upgraded to allow. A standing grant only
+// ever upgrades Ask — it never overrides an explicit decision such as deny,
+// redact, or sandbox.
+func (c *Catalog) EvaluateWithGrants(subject string, call model.ToolCall, defaults model.Decision, lookup GrantLookup) Result {
+	res := c.Evaluate(call, defaults)
+	if res.Decision != model.DecisionAsk {
+		return res
+	}
+	if subject == "" || lookup == nil || len(lookup.ActiveForSubject(subject)) == 0 {
+		return res
+	}
+	return Result{
+		Rule:       res.Rule,
+		Decision:   model.DecisionAllow,
+		Reason:     "covered by standing grant",
+		Matched:    res.Matched,
+		Precedence: res.Precedence,
 	}
 }
 
