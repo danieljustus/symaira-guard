@@ -8,13 +8,12 @@ on:
       - '**.md'
       - 'LICENSE'
       - '.github/ISSUE_TEMPLATE/**'
+  # Docs-only pull requests must still report the required status checks
+  # (Lint/Test/Vulncheck), otherwise branch protection blocks their merge
+  # with "Expected — Waiting for status to be reported". Push to main keeps
+  # the path filter to skip redundant runs on doc-only commits.
   pull_request:
     branches: ["main"]
-    paths-ignore:
-      - 'docs/**'
-      - '**.md'
-      - 'LICENSE'
-      - '.github/ISSUE_TEMPLATE/**'
   workflow_dispatch: {}  # manual trigger (e.g. to re-verify after path-filtered fixes)
 
 
