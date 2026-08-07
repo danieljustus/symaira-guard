@@ -108,10 +108,14 @@ func (g *Grant) Revoke() error {
 	return nil
 }
 
+// randRead is the entropy source for grant IDs. It is a variable so the
+// crypto/rand failure fallback is testable.
+var randRead = rand.Read
+
 // NewID returns a fresh, locally unique grant ID.
 func NewID() string {
 	var b [4]byte
-	if _, err := rand.Read(b[:]); err != nil {
+	if _, err := randRead(b[:]); err != nil {
 		// crypto/rand failure is unrecoverable; the timestamp alone still
 		// provides local uniqueness.
 		return fmt.Sprintf("gnt_%d", time.Now().UnixNano())
