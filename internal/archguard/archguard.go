@@ -2,14 +2,16 @@
 // internal packages. The intended dependency planes are:
 //
 //	model → policy → approval → audit
+//	proposal → model, config, audit (approval layer: persisted policy changes)
 //	model → output
 //	config → (standalone, consumed by all)
+//	grant → (standalone leaf, consumed by approval and policy)
 //	discovery → (standalone, consumed by scan command)
 //
 // No package in a higher plane may import a package from a lower plane
-// (e.g. audit must not import policy). Utility packages (config, discovery,
-// update) are leaf nodes — nothing in the dependency chain imports them
-// except the CLI entrypoint.
+// (e.g. audit must not import policy). Utility packages (config, grant,
+// discovery, update) are leaf nodes — nothing in the dependency chain
+// imports them except the approval/policy layers and the CLI entrypoint.
 package archguard
 
 import (
@@ -32,11 +34,13 @@ type AllowedImports map[string]map[string]bool
 // DefaultAllowed defines the canonical dependency graph.
 var DefaultAllowed = AllowedImports{
 	"model":     {},
-	"policy":    {"model": true},
-	"approval":  {"model": true},
+	"policy":    {"model": true, "grant": true},
+	"approval":  {"model": true, "grant": true},
+	"proposal":  {"model": true, "config": true, "audit": true},
 	"audit":     {"model": true},
 	"output":    {},
 	"config":    {},
+	"grant":     {},
 	"discovery": {"config": true},
 	"update":    {},
 }

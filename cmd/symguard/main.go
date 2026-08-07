@@ -12,7 +12,10 @@ import (
 	"io"
 	"os"
 
+	"github.com/danieljustus/symaira-guard/cmd/symguard/decide"
 	"github.com/danieljustus/symaira-guard/cmd/symguard/doctor"
+	"github.com/danieljustus/symaira-guard/cmd/symguard/grants"
+	"github.com/danieljustus/symaira-guard/cmd/symguard/scan"
 	"github.com/danieljustus/symaira-guard/cmd/symguard/version"
 )
 
@@ -28,11 +31,18 @@ func run(args []string, w io.Writer) int {
 		return 1
 	}
 
+	code := 0
 	switch args[0] {
 	case "version":
 		version.Run(args[1:], w)
 	case "doctor":
 		doctor.Run(w)
+	case "decide":
+		decide.Run(args[1:], os.Stdin, w, nil)
+	case "grants":
+		grants.Run(args[1:], w)
+	case "scan":
+		code = scan.Run(args[1:], w, os.Stderr)
 	case "help", "--help", "-h":
 		printUsage(w)
 	default:
@@ -44,7 +54,7 @@ func run(args []string, w io.Writer) int {
 	// Non-blocking update check after every command.
 	version.CheckLatest()
 
-	return 0
+	return code
 }
 
 func printUsage(w io.Writer) {
@@ -56,6 +66,9 @@ Usage:
 Commands:
   version   Print version and build info
   doctor    Check system health and configuration
+  decide    Read a JSON decision request from stdin, write the decision to stdout
+  grants    List and revoke standing grants
+  scan      Discover MCP servers across supported AI clients
   help      Show this help message
 
 Run 'symguard <command> --help' for details on a specific command.`)
