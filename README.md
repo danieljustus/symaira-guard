@@ -35,18 +35,38 @@ MCP solved interoperability between AI clients and tool servers. It did not solv
 
 ## Current status (implemented today)
 
-`symguard` is early-stage. The CLI currently implements only:
+`symguard` is an early but working CLI:
 
 ```bash
+$ symguard --help
+symguard — local-first security gateway for AI agents
+
+Usage:
+  symguard <command> [flags]
+
+Commands:
+  version   Print version and build info
+  doctor    Check system health and configuration
+  decide    Read a JSON decision request from stdin, write the decision to stdout
+  grants    List and revoke standing grants
+  scan      Discover MCP servers across supported AI clients
+  help      Show this help message
+
+Run 'symguard <command> --help' for details on a specific command.
+
 $ symguard version
 symguard dev
-  go      go1.26
+  go      go1.26.5
   os/arch darwin/arm64
   built   2026-01-01 (compile-time placeholder)
 
 $ symguard doctor
 symguard doctor
-...
+
+  Version:   dev
+  Go:        go1.26.5
+  OS/Arch:   darwin/arm64
+
   binary           ok
   go runtime       ok
   config           not configured (no config file found)
@@ -62,27 +82,43 @@ All basic checks passed. Run 'symguard scan' after setup for full diagnostics.
 [spawn allowlist](docs/config/spawn-allowlist.md) verdict for every
 discovered stdio MCP server, and plaintext-secret risks in their configs.
 It reports and gates — it is not a secret store (resolution stays with
-`symvault`). There is no `scan`, `policy`, `proxy`, `pin`, `audit`, or
-`remote` subcommand yet — everything below this point is
-**design intent, not shipped behavior**. Two internal packages exist to
-support this direction: `internal/config` (TOML schema for defaults/rules,
-not yet wired into the CLI) and `internal/discovery` (parses MCP config files
-from Hermes/Claude Desktop/Cursor/VS Code/OpenCode, not yet exposed via any
-command).
+`symvault`). The example above shows a machine without MCP configs; when
+servers are discovered, each gets its own verdict line and the final
+verdict reports the issue count instead.
 
-## What it does (planned)
+Beyond the CLI, these subsystems are shipped as internal packages:
+`internal/config` (TOML schema with fail-closed validation),
+`internal/discovery` (MCP config discovery for Hermes/Claude
+Desktop/Cursor/VS Code/OpenCode), `internal/policy` (deny/allow/require
+rule buckets with rule tracing, evaluated by `symguard decide`),
+`internal/sequence` (opt-in loop detection), `internal/capability`
+(purpose-bound capability tokens), `internal/spawn` (deny-by-default
+launch allowlist), `internal/proposal` (persisted policy-change requests),
+`internal/grant` (enumerable, scoped, revocable grant store — `symguard
+grants`), and `internal/audit` (hash-chained audit log with truncation
+anchors), plus `internal/approval`, `internal/model`, `internal/output`,
+`internal/update`, and `internal/archguard` (import-direction guard).
 
-### 1. Scan
+Still **design intent, not shipped**: the MCP proxy, schema pinning, and
+remote access — sections 3, 4, and 6 below.
+
+## What it does
+
+### 1. Scan — implemented (`symguard scan`)
 
 Discover MCP servers configured across local AI clients and classify their tools by risk.
 
 ```bash
-symguard scan                        # scan all clients
-symguard scan --client hermes         # scan one client
-symguard scan --format json           # machine-readable output
+symguard scan                 # scan all clients (table on a TTY, JSON otherwise)
+symguard scan --format json   # machine-readable output
+symguard scan --format table  # force human-readable output
 ```
 
-### 2. Policy
+The inventory is written to stdout with environment values redacted;
+clients or entries that could not be mapped are reported as findings on
+stderr.
+
+### 2. Policy — implemented (`internal/policy`, exposed via `symguard decide`)
 
 Define local rules that decide what gets through:
 
@@ -111,12 +147,15 @@ threshold = 3
 ```
 
 Decisions: `allow`, `ask`, `deny`, `redact`, `readonly`, `sandbox`. The TOML
-schema for this exists in `internal/config`, but nothing evaluates it yet.
-The sequence detector lives in `internal/sequence` and is exposed to the
-policy layer via `policy.NewSequenceRule`; proxy wiring lands with the
-interception path.
+schema lives in `internal/config`; `internal/policy` evaluates rules as
+deny/allow/require buckets with a fail-closed decision contract and rule
+tracing, and `symguard decide` exposes that engine over JSON stdin/stdout
+for external classifiers (see Usage). The sequence detector lives in
+`internal/sequence` and is exposed to the policy layer via
+`policy.NewSequenceRule`; per-call enforcement inside a live proxy lands
+with the interception path.
 
-### 3. Proxy
+### 3. Proxy — design intent, not yet shipped
 
 Run as an MCP proxy that enforces policy per tool call:
 
@@ -126,7 +165,7 @@ symguard proxy --config ~/.config/symguard/config.toml
 
 Each tool call is classified, policy-checked, optionally approved by a human, then forwarded upstream. Sensitive output can be redacted before it reaches the agent.
 
-### 4. Pin
+### 4. Pin — design intent, not yet shipped
 
 Store hashes of MCP tool descriptions and schemas. If a tool's description changes (hidden instructions, scope expansion), `symguard` flags it:
 
@@ -135,7 +174,7 @@ WARNING: Tool schema changed for server "filesystem" tool "read_file".
 Policy: require re-approval
 ```
 
-### 5. Audit
+### 5. Audit — implemented (`internal/audit`)
 
 Append-only local audit log with hash chaining. Records what was requested, which policy matched, who approved, what executed, and what came back.
 
@@ -157,12 +196,9 @@ append-only protection, truncation detection is robust against casual
 tampering but not against a privileged attacker who can delete both files.
 Document this limitation in deployments that accept it.
 
-### 6. Remote access
+### 6. Remote access — design intent, not yet shipped
 
 Later phases add agent-aware remote MCP access over existing transports (SSH, Tailscale, LAN/mDNS) — not a new VPN, but policy and audit on top of tools you already trust.
-
-None of sections 2–6 above are implemented yet — no policy engine, proxy,
-pinning, audit log, or remote-access code exists in this repository today.
 
 ## Risk classes
 
@@ -237,7 +273,12 @@ Or build from source:
 
 ## Build
 
-Requires Go 1.26+. No external dependencies — only the Go standard library.
+Requires Go 1.26+. Minimal external dependencies:
+[`BurntSushi/toml`](https://github.com/BurntSushi/toml) (TOML config
+parsing), [`danieljustus/symaira-corekit`](https://github.com/danieljustus/symaira-corekit)
+(version handshake and update checks), and
+[`golang.org/x/term`](https://golang.org/x/term) (TTY detection for default
+output formats).
 
 ```bash
 # Build the binary
@@ -269,9 +310,25 @@ symguard version
 
 # Version info (machine-readable JSON for GUI tools)
 symguard version --json
+{"tool":"symguard","version":"dev","schema_version":1}
 
 # System health check
 symguard doctor
+
+# Discover MCP servers across supported AI clients
+symguard scan
+symguard scan --format json
+
+# Classify one tool call through the policy engine: one JSON request on
+# stdin, one JSON decision on stdout (every error path resolves to "deny")
+echo '{"command":"rm -rf /tmp/build","risk_class":"high","domain":"localhost"}' | symguard decide
+{"decision":"confirm","reason":"high risk class requires confirmation"}
+
+# Standing grants
+symguard grants list
+No active grants.
+symguard grants revoke <id>
+symguard grants revoke --all
 ```
 
 ## Development
@@ -292,8 +349,10 @@ go vet ./...
 
 ## Status
 
-Very early development. Implemented: `version` and `doctor` CLI commands,
-plus two internal library packages (`config` schema, MCP client `discovery`)
-that are not yet wired into any command. Everything else in this README
-(scan, policy engine, proxy, pinning, audit, remote access) is design intent
-only. See [docs/intern/IDEA.md](docs/intern/IDEA.md) for the full design document.
+Working, early release. Implemented: the `version`, `doctor`, `scan`,
+`decide`, and `grants` CLI commands, plus the `config`, `discovery`,
+`policy`, `sequence`, `capability`, `spawn`, `proposal`, `grant`, `audit`,
+`approval`, `model`, `output`, and `update` internal subsystems. The MCP
+proxy, schema pinning, and remote access (sections 3, 4, and 6 above) are
+design intent only. See [docs/intern/IDEA.md](docs/intern/IDEA.md) for the
+full design document and [CHANGELOG.md](CHANGELOG.md) for release history.
