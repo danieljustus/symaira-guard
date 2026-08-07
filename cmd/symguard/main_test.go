@@ -93,6 +93,19 @@ func TestRun_Doctor(t *testing.T) {
 	}
 }
 
+func TestRun_GrantsList(t *testing.T) {
+	t.Setenv("SYMGUARD_DATA", t.TempDir())
+	var buf bytes.Buffer
+	code := run([]string{"grants", "list"}, &buf)
+	if code != 0 {
+		t.Errorf("expected exit code 0, got %d", code)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "No active grants.") {
+		t.Errorf("expected empty grants list, got: %s", out)
+	}
+}
+
 func TestPrintUsage(t *testing.T) {
 	var buf bytes.Buffer
 	printUsage(&buf)
@@ -108,6 +121,9 @@ func TestPrintUsage(t *testing.T) {
 	}
 	if !strings.Contains(out, "doctor") {
 		t.Error("expected 'doctor' in usage")
+	}
+	if !strings.Contains(out, "grants") {
+		t.Error("expected 'grants' in usage")
 	}
 	if !strings.Contains(out, "scan") {
 		t.Error("expected 'scan' in usage")
