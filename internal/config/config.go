@@ -52,17 +52,17 @@ type Defaults map[string]Decision
 // RuleMatch defines the matching criteria for a policy rule. At least one
 // field must be set. Multiple fields are ANDed together.
 type RuleMatch struct {
-	Server          string   `toml:"server,omitempty"`
-	Tool            string   `toml:"tool,omitempty"`
-	Capability      string   `toml:"capability,omitempty"`
-	CommandContains []string `toml:"command_contains,omitempty"`
+	Server          string   `toml:"server,omitempty" json:"server,omitempty"`
+	Tool            string   `toml:"tool,omitempty" json:"tool,omitempty"`
+	Capability      string   `toml:"capability,omitempty" json:"capability,omitempty"`
+	CommandContains []string `toml:"command_contains,omitempty" json:"command_contains,omitempty"`
 }
 
 // Rule maps a match pattern to a policy decision. Rules are evaluated in
 // order; the first matching rule wins.
 type Rule struct {
-	Match    RuleMatch `toml:"match"`
-	Decision Decision  `toml:"decision"`
+	Match    RuleMatch `toml:"match" json:"match"`
+	Decision Decision  `toml:"decision" json:"decision"`
 }
 
 // ProxyConfig holds upstream MCP server configuration for proxy mode.
@@ -96,6 +96,21 @@ type SequenceConfig struct {
 	Threshold int  `toml:"threshold,omitempty"`
 }
 
+// SpawnEntry is a single allowlisted stdio MCP server launch. Path is the
+// absolute path of the executable; ArgvPrefix optionally constrains the
+// leading arguments the server may be launched with. An empty ArgvPrefix
+// matches any argv.
+type SpawnEntry struct {
+	Path       string   `toml:"path"`
+	ArgvPrefix []string `toml:"argv_prefix,omitempty"`
+}
+
+// SpawnConfig governs how stdio MCP servers are launched. The allowlist is
+// deny by default: an empty allowlist permits no launch at all.
+type SpawnConfig struct {
+	Allowlist []SpawnEntry `toml:"allowlist"`
+}
+
 // Config is the top-level TOML configuration structure for symguard.
 type Config struct {
 	Defaults Defaults       `toml:"defaults"`
@@ -104,6 +119,7 @@ type Config struct {
 	Audit    AuditConfig    `toml:"audit"`
 	Remote   []RemoteTarget `toml:"remote"`
 	Sequence SequenceConfig `toml:"sequence"`
+	Spawn    SpawnConfig    `toml:"spawn"`
 }
 
 // DefaultConfig returns a Config with sensible defaults. When no config file
@@ -126,6 +142,7 @@ func DefaultConfig() *Config {
 			Enabled:   false, // opt-in: stateless by default
 			Threshold: 3,
 		},
+		Spawn: SpawnConfig{},
 	}
 }
 
@@ -226,6 +243,14 @@ func validate(cfg *Config) error {
 
 	if cfg.Sequence.Enabled && cfg.Sequence.Threshold < 2 {
 		return fmt.Errorf("sequence.threshold: must be at least 2 when sequence is enabled (got %d)", cfg.Sequence.Threshold)
+	}
+	for i, entry := range cfg.Spawn.Allowlist {
+		if entry.Path == "" {
+			return fmt.Errorf("spawn.allowlist[%d]: path is required", i)
+		}
+		if !filepath.IsAbs(entry.Path) {
+			return fmt.Errorf("spawn.allowlist[%d]: path %q must be absolute", i, entry.Path)
+		}
 	}
 
 	return nil

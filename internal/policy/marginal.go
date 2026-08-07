@@ -7,7 +7,7 @@ package policy
 type CapabilityEffect int
 
 const (
-	EffectNone        CapabilityEffect = iota
+	EffectNone CapabilityEffect = iota
 	EffectReadPublic
 	EffectReadPrivate
 	EffectReadSecret
@@ -22,16 +22,16 @@ const (
 
 // capabilityEffects maps capability names to their effects.
 var capabilityEffects = map[string]CapabilityEffect{
-	"read_public":      EffectReadPublic,
-	"read_private":     EffectReadPrivate,
-	"read_secret":      EffectReadSecret,
-	"write_file":       EffectWriteFile,
-	"shell":            EffectShell,
-	"network":          EffectNetwork,
-	"browser":          EffectBrowser,
-	"credential_use":   EffectCredentialUse,
-	"deploy":           EffectDeploy,
-	"destructive":      EffectDestructive,
+	"read_public":    EffectReadPublic,
+	"read_private":   EffectReadPrivate,
+	"read_secret":    EffectReadSecret,
+	"write_file":     EffectWriteFile,
+	"shell":          EffectShell,
+	"network":        EffectNetwork,
+	"browser":        EffectBrowser,
+	"credential_use": EffectCredentialUse,
+	"deploy":         EffectDeploy,
+	"destructive":    EffectDestructive,
 }
 
 // supersetEffects maps each effect to a set of effects it encompasses.

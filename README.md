@@ -52,13 +52,18 @@ symguard doctor
   config           not configured (no config file found)
   policy           not loaded
   audit log        not initialized
+  spawn allowlist  not configured (empty — deny by default)
+  mcp servers      none discovered
 
 All basic checks passed. Run 'symguard scan' after setup for full diagnostics.
 ```
 
-`doctor` prints a fixed set of static checks; it does not yet read the real
-config file or run live diagnostics. There is no `scan`, `policy`, `proxy`,
-`pin`, `audit`, or `remote` subcommand yet — everything below this point is
+`doctor` prints static health checks plus two live diagnostics: the
+[spawn allowlist](docs/config/spawn-allowlist.md) verdict for every
+discovered stdio MCP server, and plaintext-secret risks in their configs.
+It reports and gates — it is not a secret store (resolution stays with
+`symvault`). There is no `scan`, `policy`, `proxy`, `pin`, `audit`, or
+`remote` subcommand yet — everything below this point is
 **design intent, not shipped behavior**. Two internal packages exist to
 support this direction: `internal/config` (TOML schema for defaults/rules,
 not yet wired into the CLI) and `internal/discovery` (parses MCP config files

@@ -143,8 +143,8 @@ func TestResolve_EmptyOnPipe(t *testing.T) {
 	// Simulate pipe (non-terminal)
 	SetTerminalCheck(func(*os.File) bool { return false })
 	defer SetTerminalCheck(func(w *os.File) bool { return term.IsTerminal(int(w.Fd())) })
- 
- 	if got := Resolve(""); got != "json" {
+
+	if got := Resolve(""); got != "json" {
 		t.Errorf("Resolve(\"\") on pipe = %q, want json", got)
 	}
 }

@@ -346,3 +346,83 @@ threshold = %d
 		}
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Tests: spawn allowlist
+// ---------------------------------------------------------------------------
+
+func TestLoad_SpawnAllowlist(t *testing.T) {
+	path := writeTempConfig(t, `
+[spawn]
+
+[[spawn.allowlist]]
+path = "/usr/local/bin/node"
+argv_prefix = ["server.js", "--port"]
+
+[[spawn.allowlist]]
+path = "/opt/homebrew/bin/uvx"
+`)
+
+	cfg, err := LoadFrom(path)
+	if err != nil {
+		t.Fatalf("LoadFrom with spawn allowlist: unexpected error: %v", err)
+	}
+	if len(cfg.Spawn.Allowlist) != 2 {
+		t.Fatalf("Spawn.Allowlist len = %d, want 2", len(cfg.Spawn.Allowlist))
+	}
+	if cfg.Spawn.Allowlist[0].Path != "/usr/local/bin/node" {
+		t.Errorf("Allowlist[0].Path = %q, want %q", cfg.Spawn.Allowlist[0].Path, "/usr/local/bin/node")
+	}
+	if len(cfg.Spawn.Allowlist[0].ArgvPrefix) != 2 || cfg.Spawn.Allowlist[0].ArgvPrefix[1] != "--port" {
+		t.Errorf("Allowlist[0].ArgvPrefix = %v, want [server.js --port]", cfg.Spawn.Allowlist[0].ArgvPrefix)
+	}
+	if cfg.Spawn.Allowlist[1].Path != "/opt/homebrew/bin/uvx" {
+		t.Errorf("Allowlist[1].Path = %q, want %q", cfg.Spawn.Allowlist[1].Path, "/opt/homebrew/bin/uvx")
+	}
+	if len(cfg.Spawn.Allowlist[1].ArgvPrefix) != 0 {
+		t.Errorf("Allowlist[1].ArgvPrefix = %v, want empty", cfg.Spawn.Allowlist[1].ArgvPrefix)
+	}
+}
+
+func TestLoad_SpawnAllowlistDefaultsToEmpty(t *testing.T) {
+	// No [spawn] section: the allowlist must be empty (deny by default).
+	path := writeTempConfig(t, `
+[defaults]
+shell = "ask"
+`)
+	cfg, err := LoadFrom(path)
+	if err != nil {
+		t.Fatalf("LoadFrom without spawn section: unexpected error: %v", err)
+	}
+	if len(cfg.Spawn.Allowlist) != 0 {
+		t.Errorf("Spawn.Allowlist len = %d, want 0 (deny by default)", len(cfg.Spawn.Allowlist))
+	}
+}
+
+func TestLoad_SpawnAllowlistValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+	}{
+		{"missing path", "[spawn]\n[[spawn.allowlist]]\nargv_prefix = [\"x\"]\n"},
+		{"relative path", "[spawn]\n[[spawn.allowlist]]\npath = \"node\"\n"},
+		{"relative path with slashes", "[spawn]\n[[spawn.allowlist]]\npath = \"usr/bin/node\"\n"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := writeTempConfig(t, tt.content)
+			_, err := LoadFrom(path)
+			if err == nil {
+				t.Fatalf("LoadFrom with invalid spawn entry: expected error, got nil")
+			}
+		})
+	}
+}
+
+func TestDefaultConfig_SpawnAllowlistEmpty(t *testing.T) {
+	cfg := DefaultConfig()
+	if len(cfg.Spawn.Allowlist) != 0 {
+		t.Errorf("DefaultConfig Spawn.Allowlist len = %d, want 0", len(cfg.Spawn.Allowlist))
+	}
+}
