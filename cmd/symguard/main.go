@@ -51,8 +51,14 @@ func run(args []string, w io.Writer) int {
 		return 1
 	}
 
-	// Non-blocking update check after every command.
-	version.CheckLatest()
+	// Best-effort update check after interactive commands. Machine-facing
+	// commands (decide, scan) skip it: a decision or scan run must never
+	// wait on an unreachable GitHub.
+	switch args[0] {
+	case "decide", "scan":
+	default:
+		version.CheckLatest()
+	}
 
 	return code
 }
