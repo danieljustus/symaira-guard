@@ -1,6 +1,7 @@
 package audit
 
 import (
+	"encoding/json"
 	"testing"
 )
 
@@ -83,5 +84,31 @@ func TestCaseBundle(t *testing.T) {
 	}
 	if len(bundle.Events) != 1 {
 		t.Errorf("Expected 1 event, got %d", len(bundle.Events))
+	}
+}
+
+func TestProposalAppliedRecord(t *testing.T) {
+	rec := ProposalApplied{
+		ProposalID: "prop_001",
+		Action:     "set",
+		Rule:       `{"match":{"server":"symseek"},"decision":"allow"}`,
+		AppliedBy:  "human-1",
+		AppliedAt:  "2026-08-06T12:00:00Z",
+	}
+	if rec.ProposalID != "prop_001" || rec.Action != "set" || rec.AppliedBy != "human-1" {
+		t.Errorf("ProposalApplied fields mismatch: %+v", rec)
+	}
+	data, err := json.Marshal(rec)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	for _, key := range []string{"proposal_id", "action", "rule", "applied_by", "applied_at"} {
+		if _, ok := got[key]; !ok {
+			t.Errorf("record missing json key %q", key)
+		}
 	}
 }
