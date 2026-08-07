@@ -38,6 +38,7 @@ package policy
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/danieljustus/symaira-guard/internal/grant"
 	"github.com/danieljustus/symaira-guard/internal/model"
@@ -312,7 +313,7 @@ func matches(m MatchCriteria, call model.ToolCall) (bool, error) {
 		}
 		matched := false
 		for _, substr := range m.CommandContains {
-			if contains(args, substr) {
+			if strings.Contains(args, substr) {
 				matched = true
 				break
 			}
@@ -322,19 +323,6 @@ func matches(m MatchCriteria, call model.ToolCall) (bool, error) {
 		}
 	}
 	return true, nil
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && searchString(s, substr)
-}
-
-func searchString(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
 
 // Validate checks the catalog for structural errors.
