@@ -74,6 +74,7 @@ func TestValidateDecision(t *testing.T) {
 		{"allow", DecisionAllow, false},
 		{"ask", DecisionAsk, false},
 		{"deny", DecisionDeny, false},
+		{"require", DecisionRequire, false},
 		{"redact", DecisionRedact, false},
 		{"readonly", DecisionReadOnly, false},
 		{"sandbox", DecisionSandbox, false},
