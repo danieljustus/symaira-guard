@@ -1,6 +1,7 @@
 package grant
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +16,39 @@ func testGrant(id, subject string, scope Scope) *Grant {
 		Origin:    Origin{Epoch: 1722924000, Via: "approval"},
 		GrantedAt: time.Date(2026, 8, 6, 10, 0, 0, 0, time.UTC),
 		Subject:   subject,
+	}
+}
+
+func TestNewID(t *testing.T) {
+	seen := make(map[string]bool)
+	for i := 0; i < 1000; i++ {
+		id := NewID()
+		if seen[id] {
+			t.Fatalf("NewID() returned duplicate %q", id)
+		}
+		seen[id] = true
+		if !strings.HasPrefix(id, "gnt_") {
+			t.Errorf("NewID() = %q, want gnt_ prefix", id)
+		}
+		parts := strings.Split(id, "_")
+		if len(parts) != 3 || parts[0] != "gnt" || len(parts[2]) != 8 {
+			t.Errorf("NewID() = %q, want shape gnt_<nanos>_<8-hex>", id)
+		}
+	}
+}
+
+func TestNewID_RandFailureFallback(t *testing.T) {
+	old := randRead
+	t.Cleanup(func() { randRead = old })
+	randRead = func(b []byte) (int, error) { return 0, errors.New("entropy unavailable") }
+
+	id := NewID()
+	if !strings.HasPrefix(id, "gnt_") {
+		t.Errorf("NewID() = %q, want gnt_ prefix", id)
+	}
+	// Fallback shape: timestamp only, no hex suffix.
+	if strings.Count(id, "_") != 1 {
+		t.Errorf("NewID() = %q, want timestamp-only fallback shape", id)
 	}
 }
 
