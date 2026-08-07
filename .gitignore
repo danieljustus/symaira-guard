@@ -7,6 +7,9 @@ docs/intern/
 # Local working directories
 .worktrees/
 .github/audit/
+.github/review/
+.github/coverage/
+coverage.out
 
 # gh-adopt reports (local analysis, not tracked)
 docs/adopt/
