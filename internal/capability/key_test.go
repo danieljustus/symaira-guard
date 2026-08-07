@@ -124,8 +124,36 @@ func TestLoadOrCreateKey_FailClosed(t *testing.T) {
 	}
 }
 
+func TestLoadKey(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "key.bin")
+	key := testKey(t)
+	if err := os.WriteFile(path, key, 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	got, err := LoadKey(path)
+	if err != nil {
+		t.Fatalf("LoadKey() error = %v", err)
+	}
+	if string(got) != string(key) {
+		t.Error("LoadKey() returned different key material")
+	}
+}
+
 func TestLoadKey_Missing(t *testing.T) {
-	if _, err := LoadKey(filepath.Join(t.TempDir(), "nope.key")); err == nil {
-		t.Error("expected error for missing key file")
+	// LoadKey wraps the read error; errors.Is must still see ErrNotExist
+	// through the wrap chain (os.IsNotExist alone would not).
+	if _, err := LoadKey(filepath.Join(t.TempDir(), "nope.key")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("LoadKey(missing) error = %v, want os.ErrNotExist", err)
+	}
+}
+
+func TestLoadKey_TooShort(t *testing.T) {
+	// Fail closed: a present-but-too-short key file must not be accepted.
+	path := filepath.Join(t.TempDir(), "short.key")
+	if err := os.WriteFile(path, []byte("too short"), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	if _, err := LoadKey(path); !errors.Is(err, ErrNoKeyMaterial) {
+		t.Errorf("LoadKey(short) error = %v, want %v", err, ErrNoKeyMaterial)
 	}
 }
