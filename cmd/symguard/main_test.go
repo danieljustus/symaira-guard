@@ -2,11 +2,14 @@ package main
 
 import (
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/danieljustus/symaira-guard/cmd/symguard/doctor"
 	"github.com/danieljustus/symaira-guard/cmd/symguard/version"
+	"github.com/danieljustus/symaira-guard/internal/output"
+	"golang.org/x/term"
 )
 
 func TestRun_NoArgs(t *testing.T) {
@@ -90,6 +93,19 @@ func TestRun_Doctor(t *testing.T) {
 	}
 }
 
+func TestRun_GrantsList(t *testing.T) {
+	t.Setenv("SYMGUARD_DATA", t.TempDir())
+	var buf bytes.Buffer
+	code := run([]string{"grants", "list"}, &buf)
+	if code != 0 {
+		t.Errorf("expected exit code 0, got %d", code)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "No active grants.") {
+		t.Errorf("expected empty grants list, got: %s", out)
+	}
+}
+
 func TestPrintUsage(t *testing.T) {
 	var buf bytes.Buffer
 	printUsage(&buf)
@@ -105,6 +121,44 @@ func TestPrintUsage(t *testing.T) {
 	}
 	if !strings.Contains(out, "doctor") {
 		t.Error("expected 'doctor' in usage")
+	}
+	if !strings.Contains(out, "decide") {
+		t.Error("expected 'decide' in usage")
+	}
+	if !strings.Contains(out, "grants") {
+		t.Error("expected 'grants' in usage")
+	}
+	if !strings.Contains(out, "scan") {
+		t.Error("expected 'scan' in usage")
+	}
+}
+
+func TestRun_Scan(t *testing.T) {
+	// Force table format so the assertion is deterministic regardless of
+	// whether the test runner's stdout is a terminal.
+	output.SetTerminalCheck(func(*os.File) bool { return true })
+	defer output.SetTerminalCheck(func(w *os.File) bool { return term.IsTerminal(int(w.Fd())) })
+
+	var buf bytes.Buffer
+	code := run([]string{"scan"}, &buf)
+	if code != 0 {
+		t.Errorf("expected exit code 0, got %d", code)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "Discovered") || !strings.Contains(out, "MCP server") {
+		t.Errorf("expected inventory output, got: %s", out)
+	}
+}
+
+func TestRun_ScanJSON(t *testing.T) {
+	var buf bytes.Buffer
+	code := run([]string{"scan", "--format", "json"}, &buf)
+	if code != 0 {
+		t.Errorf("expected exit code 0, got %d", code)
+	}
+	out := buf.String()
+	if !strings.Contains(out, `"servers"`) {
+		t.Errorf("expected JSON inventory, got: %s", out)
 	}
 }
 
@@ -132,6 +186,17 @@ func TestCmdDoctor(t *testing.T) {
 	}
 	if !strings.Contains(out, "config") {
 		t.Error("expected 'config' check")
+	}
+}
+
+func TestRun_DecideHelp(t *testing.T) {
+	var buf bytes.Buffer
+	code := run([]string{"decide", "--help"}, &buf)
+	if code != 0 {
+		t.Errorf("expected exit code 0, got %d", code)
+	}
+	if !strings.Contains(buf.String(), "symguard decide") {
+		t.Error("expected decide usage output")
 	}
 }
 
