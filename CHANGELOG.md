@@ -9,6 +9,8 @@ the [Unreleased] section is moved into a dated version section.
 
 ## [Unreleased]
 
+## [v0.4.0] - 2026-08-07
+
 ### Added
 - Policy engine: deny/allow/require rule buckets with a fail-closed decision contract and rule tracing (#98)
 - `symguard scan`: discover MCP servers across supported AI clients, with findings reporting (#99)
