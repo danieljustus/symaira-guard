@@ -350,9 +350,8 @@ go vet ./...
 ## Status
 
 Working, early release. Implemented: the `version`, `doctor`, `scan`,
-`decide`, and `grants` CLI commands, plus the `config`, `discovery`,
-`policy`, `sequence`, `capability`, `spawn`, `proposal`, `grant`, `audit`,
-`approval`, `model`, `output`, and `update` internal subsystems. The MCP
-proxy, schema pinning, and remote access (sections 3, 4, and 6 above) are
-design intent only. See [docs/intern/IDEA.md](docs/intern/IDEA.md) for the
+`decide`, and `grants` CLI commands, backed by the policy, capability,
+grant, approval, audit, discovery, and spawn subsystems under `internal/`
+(run `ls internal/` for the current list). The MCP proxy, schema pinning,
+and remote access (sections 3, 4, and 6 above) are design intent only. See [docs/intern/IDEA.md](docs/intern/IDEA.md) for the
 full design document and [CHANGELOG.md](CHANGELOG.md) for release history.
