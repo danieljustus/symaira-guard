@@ -203,6 +203,25 @@ func TestRun_DecideHelp(t *testing.T) {
 	}
 }
 
+// errWriter fails every Write, simulating a broken decision transport.
+type errWriter struct{}
+
+func (errWriter) Write([]byte) (int, error) {
+	return 0, os.ErrClosed
+}
+
+func TestRun_DecideExitCodePropagated(t *testing.T) {
+	// decide's contract: exit 1 when the JSON response itself cannot be
+	// written. The router must propagate that code (it was previously
+	// discarded). The audit sink is redirected into a temp dir so the
+	// test never touches the real XDG data directory.
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	code := run([]string{"decide"}, errWriter{})
+	if code != 1 {
+		t.Errorf("expected exit code 1 on unwritable response, got %d", code)
+	}
+}
+
 func TestBuildTime(t *testing.T) {
 	// buildTime is an unexported function in the version package.
 	// Test that version output includes the placeholder.
