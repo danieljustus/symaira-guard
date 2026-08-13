@@ -72,8 +72,8 @@ symguard doctor
   binary           ok
   go runtime       ok
   config           not configured (no config file found)
-  policy           not loaded
-  audit log        not initialized
+  policy           defaults only (no rules — deny by default)
+  audit log        not initialized (created on first 'symguard decide')
   spawn allowlist  not configured (empty — deny by default)
   mcp servers      none discovered
 
