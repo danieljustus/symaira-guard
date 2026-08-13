@@ -8,6 +8,8 @@
 [![Go](https://img.shields.io/github/go-mod/go-version/danieljustus/symaira-guard)](https://go.dev/)
 [![License](https://img.shields.io/github/license/danieljustus/symaira-guard)](https://github.com/danieljustus/symaira-guard/blob/main/LICENSE)
 
+![symguard pipeline: AI client → symguard (scan → policy → audit) → MCP servers](docs/assets/pipeline.svg)
+
 ---
 
 ## What
