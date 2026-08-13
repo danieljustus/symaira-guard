@@ -38,7 +38,7 @@ func run(args []string, w io.Writer) int {
 	case "doctor":
 		doctor.Run(w)
 	case "decide":
-		decide.Run(args[1:], os.Stdin, w, nil)
+		code = decide.Run(args[1:], os.Stdin, w, nil)
 	case "grants":
 		grants.Run(args[1:], w)
 	case "scan":
