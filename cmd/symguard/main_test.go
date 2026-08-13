@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -78,9 +79,6 @@ func TestRun_Version(t *testing.T) {
 func TestRun_Doctor(t *testing.T) {
 	var buf bytes.Buffer
 	code := run([]string{"doctor"}, &buf)
-	if code != 0 {
-		t.Errorf("expected exit code 0, got %d", code)
-	}
 	out := buf.String()
 	if !strings.Contains(out, "symguard doctor") {
 		t.Error("expected doctor header")
@@ -89,10 +87,15 @@ func TestRun_Doctor(t *testing.T) {
 		t.Error("expected version in doctor output")
 	}
 	// Doctor's verdict depends on the host environment: a machine with
-	// discovered MCP servers and no spawn allowlist reports issues, a clean
-	// machine reports all clear.
-	if !strings.Contains(out, "All basic checks passed") && !strings.Contains(out, "issue(s) found") {
-		t.Error("expected completion message or issue summary")
+	// discovered MCP servers and no spawn allowlist reports issues and
+	// exits 1, a clean machine reports all clear and exits 0. The exit
+	// code must be consistent with the printed summary.
+	hasIssues := strings.Contains(out, "issue(s) found")
+	if hasIssues && code != 1 {
+		t.Errorf("expected exit code 1 when doctor reports issues, got %d", code)
+	}
+	if !hasIssues && code != 0 {
+		t.Errorf("expected exit code 0 when doctor reports all clear, got %d", code)
 	}
 }
 
@@ -179,7 +182,7 @@ func TestCmdVersion(t *testing.T) {
 
 func TestCmdDoctor(t *testing.T) {
 	var buf bytes.Buffer
-	doctor.Run(&buf)
+	code := doctor.Run(&buf)
 	out := buf.String()
 	if !strings.Contains(out, "symguard doctor") {
 		t.Error("expected doctor header")
@@ -189,6 +192,42 @@ func TestCmdDoctor(t *testing.T) {
 	}
 	if !strings.Contains(out, "config") {
 		t.Error("expected 'config' check")
+	}
+	// Host-dependent verdict: the exit code must match the printed summary.
+	hasIssues := strings.Contains(out, "issue(s) found")
+	if hasIssues && code != 1 {
+		t.Errorf("expected exit code 1 when doctor reports issues, got %d", code)
+	}
+	if !hasIssues && code != 0 {
+		t.Errorf("expected exit code 0 when doctor reports all clear, got %d", code)
+	}
+}
+
+func TestRun_DoctorExitCodePropagated(t *testing.T) {
+	// A discovered server denied by the empty spawn allowlist makes doctor
+	// report an issue; the router must propagate the non-zero exit code
+	// (it previously always exited 0).
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("SYMGUARD_CONFIG", filepath.Join(t.TempDir(), "missing.toml"))
+
+	cursorDir := filepath.Join(home, ".cursor")
+	if err := os.MkdirAll(cursorDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	mcp := `{"mcpServers": {"demo": {"command": "/usr/bin/true"}}}`
+	if err := os.WriteFile(filepath.Join(cursorDir, "mcp.json"), []byte(mcp), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	var buf bytes.Buffer
+	code := run([]string{"doctor"}, &buf)
+	if code != 1 {
+		t.Errorf("expected exit code 1 when doctor reports issues, got %d", code)
+	}
+	if !strings.Contains(buf.String(), "1 issue(s) found") {
+		t.Errorf("expected doctor issue summary, got: %s", buf.String())
 	}
 }
 

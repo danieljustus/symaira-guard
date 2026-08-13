@@ -9,15 +9,20 @@ package doctor
 import (
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"runtime"
 
+	"github.com/danieljustus/symaira-guard/internal/audit"
 	"github.com/danieljustus/symaira-guard/internal/config"
 	"github.com/danieljustus/symaira-guard/internal/discovery"
 	"github.com/danieljustus/symaira-guard/internal/spawn"
 )
 
-// Run prints system health and configuration information to w.
-func Run(w io.Writer) {
+// Run prints system health and configuration information to w and returns
+// an exit code: 0 when every check passed, 1 when any check reported an
+// issue or errored.
+func Run(w io.Writer) int {
 	fmt.Fprintln(w, "symguard doctor")
 	fmt.Fprintln(w)
 	fmt.Fprintf(w, "  Version:   %s\n", versionInfo())
@@ -25,60 +30,107 @@ func Run(w io.Writer) {
 	fmt.Fprintf(w, "  OS/Arch:   %s/%s\n", runtime.GOOS, runtime.GOARCH)
 	fmt.Fprintln(w)
 
-	checks := []struct {
-		name   string
-		status string
-	}{
-		{"binary", "ok"},
-		{"go runtime", "ok"},
-		{"config", "not configured (no config file found)"},
-		{"policy", "not loaded"},
-		{"audit log", "not initialized"},
+	fmt.Fprintf(w, "  %-16s %s\n", "binary", "ok")
+	fmt.Fprintf(w, "  %-16s %s\n", "go runtime", "ok")
+
+	problems := 0
+	report := func(name, status string, isIssue bool) {
+		if isIssue {
+			problems++
+		}
+		fmt.Fprintf(w, "  %-16s %s\n", name, status)
+	}
+
+	// Config: reflect the actual load result. A missing file is normal and
+	// resolves to fail-closed defaults; a file that exists but does not
+	// parse is a real problem.
+	cfg, err := config.Load()
+	if _, statErr := os.Stat(config.ConfigPath()); os.IsNotExist(statErr) {
+		report("config", "not configured (no config file found)", false)
+	} else if err != nil {
+		report("config", fmt.Sprintf("error: %v", err), true)
+	} else {
+		report("config", "ok", false)
+	}
+
+	// Policy: with a healthy config the rule count is the real state; with
+	// a config error policy cannot be loaded. An empty rule list still
+	// enforces the fail-closed defaults, so it is not an issue.
+	switch {
+	case err != nil:
+		report("policy", "not loaded (config error)", true)
+	case len(cfg.Rules) > 0:
+		report("policy", fmt.Sprintf("ok (%d rule(s))", len(cfg.Rules)), false)
+	default:
+		report("policy", "defaults only (no rules — deny by default)", false)
+	}
+
+	// Audit log: probe the XDG data path. A missing log is normal until the
+	// first `symguard decide` call creates it; a log whose chain anchor is
+	// missing or unreadable loses truncation detection and is a problem.
+	logPath := defaultAuditLogPath()
+	anchorPath := audit.DefaultAnchorPath(logPath)
+	switch _, statErr := os.Stat(logPath); {
+	case os.IsNotExist(statErr):
+		report("audit log", "not initialized (created on first 'symguard decide')", false)
+	case statErr != nil:
+		report("audit log", fmt.Sprintf("error: %v", statErr), true)
+	default:
+		if _, err := os.ReadFile(anchorPath); err != nil {
+			report("audit log", fmt.Sprintf("error: anchor %s unreadable (%v)", anchorPath, err), true)
+		} else {
+			report("audit log", "ok (hash-chained, anchor present)", false)
+		}
 	}
 
 	// Spawn allowlist and discovered MCP servers: doctor reports and gates,
 	// it does not become a secret store.
-	var (
-		serverChecks []ServerCheck
-		issues       int
-	)
-	cfg, err := config.Load()
-	if err != nil {
-		checks = append(checks, struct{ name, status string }{"spawn allowlist", fmt.Sprintf("error: %v", err)})
-	} else {
+	var serverChecks []ServerCheck
+	if err == nil {
 		allowlist := spawn.NewAllowlist(cfg.Spawn.Allowlist)
 		if allowlist.Len() == 0 {
-			checks = append(checks, struct{ name, status string }{"spawn allowlist", "not configured (empty — deny by default)"})
+			report("spawn allowlist", "not configured (empty — deny by default)", false)
 		} else {
-			checks = append(checks, struct{ name, status string }{"spawn allowlist", fmt.Sprintf("ok (%d entries)", allowlist.Len())})
+			report("spawn allowlist", fmt.Sprintf("ok (%d entries)", allowlist.Len()), false)
 		}
 
 		servers, discErr := discovery.DiscoverAll()
 		switch {
 		case discErr != nil:
-			checks = append(checks, struct{ name, status string }{"mcp servers", fmt.Sprintf("error: %v", discErr)})
+			report("mcp servers", fmt.Sprintf("error: %v", discErr), true)
 		case len(servers) == 0:
-			checks = append(checks, struct{ name, status string }{"mcp servers", "none discovered"})
+			report("mcp servers", "none discovered", false)
 		default:
-			checks = append(checks, struct{ name, status string }{"mcp servers", fmt.Sprintf("%d discovered", len(servers))})
+			report("mcp servers", fmt.Sprintf("%d discovered", len(servers)), false)
 			serverChecks = checkServers(servers, allowlist)
-			issues = issueCount(serverChecks)
+			problems += issueCount(serverChecks)
 		}
-	}
-
-	for _, c := range checks {
-		fmt.Fprintf(w, "  %-16s %s\n", c.name, c.status)
 	}
 
 	printServerChecks(w, serverChecks)
 	printSecretRisks(w, serverChecks)
 
 	fmt.Fprintln(w)
-	if issues == 0 {
+	if problems == 0 {
 		fmt.Fprintln(w, "All basic checks passed. Run 'symguard scan' after setup for full diagnostics.")
-	} else {
-		fmt.Fprintf(w, "%d issue(s) found. See details above.\n", issues)
+		return 0
 	}
+	fmt.Fprintf(w, "%d issue(s) found. See details above.\n", problems)
+	return 1
+}
+
+// defaultAuditLogPath returns the XDG data path for the audit log. It
+// mirrors the decide command's default sink so doctor probes the same file
+// the rest of symguard writes.
+func defaultAuditLogPath() string {
+	if dir := os.Getenv("XDG_DATA_HOME"); dir != "" {
+		return filepath.Join(dir, "symguard", "audit.log")
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return filepath.Join(os.TempDir(), "symguard", "audit.log")
+	}
+	return filepath.Join(home, ".local", "share", "symguard", "audit.log")
 }
 
 // versionInfo returns the version string for display.
