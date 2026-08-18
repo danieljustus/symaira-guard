@@ -420,6 +420,49 @@ func TestLoad_SpawnAllowlistValidation(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// Tests: DataDir
+// ---------------------------------------------------------------------------
+
+func TestDataDir_XDGDataHome(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", "/xdg/data")
+	want := filepath.Join("/xdg/data", "symguard")
+	if got := DataDir(); got != want {
+		t.Errorf("with XDG_DATA_HOME: got %q, want %q", got, want)
+	}
+}
+
+func TestDataDir_HomeFallback(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", "")
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skipf("cannot determine home dir: %v", err)
+	}
+	want := filepath.Join(home, ".local", "share", "symguard")
+	if got := DataDir(); got != want {
+		t.Errorf("without XDG_DATA_HOME: got %q, want %q", got, want)
+	}
+}
+
+func TestDataDir_TempDirFallback(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", "")
+	// Override HOME to trigger UserHomeDir error — on most systems this
+	// is hard to force, so we skip if UserHomeDir still succeeds.
+	t.Setenv("HOME", "/nonexistent/path/to/home/that/does/not/exist")
+	homeErr := func() error {
+		_, err := os.UserHomeDir()
+		return err
+	}()
+	if homeErr != nil {
+		want := filepath.Join(os.TempDir(), "symguard")
+		if got := DataDir(); got != want {
+			t.Errorf("on UserHomeDir error: got %q, want %q", got, want)
+		}
+	} else {
+		t.Skip("UserHomeDir did not fail with overridden HOME; cannot test temp fallback")
+	}
+}
+
 func TestDefaultConfig_SpawnAllowlistEmpty(t *testing.T) {
 	cfg := DefaultConfig()
 	if len(cfg.Spawn.Allowlist) != 0 {

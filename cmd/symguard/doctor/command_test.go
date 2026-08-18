@@ -5,6 +5,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/danieljustus/symaira-guard/internal/audit"
+	"github.com/danieljustus/symaira-guard/internal/config"
 )
 
 // hermeticEnv points every host-dependent path (config, discovery, home) at
@@ -224,5 +227,147 @@ func TestRun_AuditLogCorruptAnchor(t *testing.T) {
 	}
 	if !strings.Contains(out, "audit log        error: anchor") || !strings.Contains(out, "1 issue(s) found") {
 		t.Errorf("Run() output missing anchor problem:\n%s", out)
+	}
+}
+
+func TestRun_AuditLogStatError(t *testing.T) {
+	// Trigger the non-IsNotExist stat error branch: the audit log path
+	// resolves inside a 0000 directory so os.Stat returns permission
+	// denied, which is a distinct error from IsNotExist.
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("SYMGUARD_CONFIG", filepath.Join(t.TempDir(), "missing.toml"))
+
+	// Create the symguard data directory and lock it down.
+	dataDir := filepath.Join(config.DataDir())
+	if err := os.MkdirAll(dataDir, 0o700); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.Chmod(dataDir, 0o000); err != nil {
+		t.Fatalf("Chmod() error = %v", err)
+	}
+	t.Cleanup(func() { os.Chmod(dataDir, 0o700) }) //nolint:errcheck
+
+	doctorSetVersion(t, "test-1.2.3")
+
+	var buf strings.Builder
+	code := Run(&buf)
+	out := buf.String()
+
+	if code != 1 {
+		t.Errorf("Run() = %d, want 1 when audit log stat fails:\n%s", code, out)
+	}
+	if !strings.Contains(out, "audit log        error:") {
+		t.Errorf("Run() output missing audit log error:\n%s", out)
+	}
+	if !strings.Contains(out, "1 issue(s) found") {
+		t.Errorf("Run() output missing issue summary:\n%s", out)
+	}
+}
+
+func TestRun_ValidAnchor(t *testing.T) {
+	// A valid chain anchor must be reported as ok, not as an issue.
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("SYMGUARD_CONFIG", filepath.Join(t.TempDir(), "missing.toml"))
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+
+	logPath := filepath.Join(os.Getenv("XDG_DATA_HOME"), "symguard", "audit.log")
+	if err := os.MkdirAll(filepath.Dir(logPath), 0o700); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(logPath, []byte("{\"entry\":1}\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	// Write a valid chain anchor via the audit package.
+	anchorPath := audit.DefaultAnchorPath(logPath)
+	if err := audit.WriteCheckpoint(anchorPath, "abc123", 42); err != nil {
+		t.Fatalf("WriteCheckpoint() error = %v", err)
+	}
+
+	doctorSetVersion(t, "test-1.2.3")
+
+	var buf strings.Builder
+	code := Run(&buf)
+	out := buf.String()
+
+	if code != 0 {
+		t.Errorf("Run() = %d, want 0 for a valid anchor:\n%s", code, out)
+	}
+	if !strings.Contains(out, "ok (hash-chained, anchor present)") {
+		t.Errorf("Run() output missing anchor-present note:\n%s", out)
+	}
+	if strings.Contains(out, "issue(s) found") {
+		t.Errorf("Run() reported issues for a valid anchor:\n%s", out)
+	}
+}
+
+func TestRun_NonEmptyAllowlist(t *testing.T) {
+	// A config with a spawn allowlist entry must report the entry count.
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", home)
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+
+	cfg := "[[spawn.allowlist]]\npath = \"/usr/local/bin/true\"\n"
+	if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte(cfg), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	t.Setenv("SYMGUARD_CONFIG", filepath.Join(home, "config.toml"))
+
+	doctorSetVersion(t, "test-1.2.3")
+
+	var buf strings.Builder
+	code := Run(&buf)
+	out := buf.String()
+
+	if code != 0 {
+		t.Errorf("Run() = %d, want 0 with a valid allowlist:\n%s", code, out)
+	}
+	if !strings.Contains(out, "spawn allowlist  ok (1 entries)") {
+		t.Errorf("Run() output missing allowlist count:\n%s", out)
+	}
+}
+
+func TestRun_DiscoveryError(t *testing.T) {
+	// A malformed mcp.json must surface as a discovery error.
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", home)
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+
+	// Valid config with an allowlist entry so the spawn section is entered.
+	cfg := "[[spawn.allowlist]]\npath = \"/usr/local/bin/true\"\n"
+	if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte(cfg), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	t.Setenv("SYMGUARD_CONFIG", filepath.Join(home, "config.toml"))
+
+	// Malformed mcp.json for Cursor to trigger a parse error.
+	cursorDir := filepath.Join(home, ".cursor")
+	if err := os.MkdirAll(cursorDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cursorDir, "mcp.json"), []byte("not valid json {{{"), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	doctorSetVersion(t, "test-1.2.3")
+
+	var buf strings.Builder
+	code := Run(&buf)
+	out := buf.String()
+
+	if code != 1 {
+		t.Errorf("Run() = %d, want 1 on a discovery error:\n%s", code, out)
+	}
+	if !strings.Contains(out, "mcp servers      error:") {
+		t.Errorf("Run() output missing MCP error line:\n%s", out)
+	}
+	if !strings.Contains(out, "1 issue(s) found") {
+		t.Errorf("Run() output missing issue summary:\n%s", out)
 	}
 }
