@@ -14,13 +14,32 @@ symaira-guard/
 ├── cmd/symguard/          # CLI entrypoint (main package): routing only
 │   ├── main.go
 │   ├── main_test.go
+│   ├── decide/            # `symguard decide` command
+│   │   └── command.go
 │   ├── doctor/            # `symguard doctor` command
+│   │   ├── checks.go
+│   │   └── command.go
+│   ├── grants/            # `symguard grants` command
+│   │   └── command.go
+│   ├── scan/              # `symguard scan` command
 │   │   └── command.go
 │   └── version/           # `symguard version` command
 │       └── command.go
 ├── internal/              # Private packages (not importable outside this module)
-│   ├── config/            # TOML config schema + loader (exists, not yet wired into CLI)
-│   └── discovery/         # MCP config discovery across AI clients (exists, not yet exposed via a command)
+│   ├── approval/          # Data contract for pending approval requests and human decisions
+│   ├── archguard/         # Enforces allowed import directions between internal packages
+│   ├── audit/             # Append-only audit log, evidence references, and security case bundles
+│   ├── capability/        # Short-lived, purpose-bound capability tokens for headless callers
+│   ├── config/            # TOML configuration schema and XDG path loader
+│   ├── discovery/         # MCP server config discovery across AI client applications
+│   ├── grant/             # Enumerable, scoped, revocable grant model
+│   ├── model/             # Versioned, redaction-safe event contract
+│   ├── output/            # Reporter interface and format-specific result renderers
+│   ├── policy/            # Versioned rule catalog and evaluation engine
+│   ├── proposal/          # Persisted request type for durable policy changes
+│   ├── sequence/          # Stateful bounded-window detector for repetitive tool-call patterns
+│   ├── spawn/             # Governs how stdio MCP servers are launched
+│   └── update/            # Update checking via corekit
 ├── docs/                  # Documentation
 │   └── intern/            # Internal design docs (IDEA.md)
 ├── go.mod
@@ -32,10 +51,9 @@ symaira-guard/
 
 **Not yet created** (planned subsystems from the design doc — do not assume
 these exist when navigating the repo): `internal/mcp/`, `internal/remote/`,
-`internal/identity/`, `internal/policy/`, `internal/approval/`,
-`internal/audit/`, `internal/pinning/`, `internal/diag/`, `internal/redact/`,
-`internal/integrations/`. Create them only when the corresponding feature is
-actually implemented.
+`internal/identity/`, `internal/pinning/`, `internal/diag/`,
+`internal/redact/`, `internal/integrations/`. Create them only when the
+corresponding feature is actually implemented.
 
 **Rules:**
 - Use `cmd/` for CLI entrypoints, `internal/` for all private logic.
