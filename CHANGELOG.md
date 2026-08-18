@@ -9,6 +9,25 @@ the [Unreleased] section is moved into a dated version section.
 
 ## [Unreleased]
 
+### Added
+- Extract shared `config.DataDir()` helper for XDG data-dir resolution (#144)
+- Doctor edge-branch tests: permission denied, valid anchor, spawn allowlist, malformed mcp.json (#144)
+- `symguard doctor` reports real config/policy/audit state and exits non-zero on issues (#133)
+
+### Fixed
+- Stop doctor from flagging a missing audit anchor as an issue (#141)
+- Propagate `symguard decide` exit code through the CLI router (#129)
+
+### Changed
+- Bump `github.com/danieljustus/symaira-corekit` (#135)
+- Bump zizmorcore/zizmor-action from 0.6.1 to 0.6.2 (#127)
+- Bump github/codeql-action/* from 4.37.4 to 4.37.5 (#124, #125, #126)
+
+### Docs
+- Regenerate AGENTS.md project-structure section (#140)
+- Add pipeline diagram to README (#134)
+- Stop enumerating internal packages in the status section (#128)
+
 ## [v0.4.0] - 2026-08-07
 
 ### Added
