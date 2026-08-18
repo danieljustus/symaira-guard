@@ -9,6 +9,8 @@ the [Unreleased] section is moved into a dated version section.
 
 ## [Unreleased]
 
+## [v0.4.1] - 2026-08-18
+
 ### Added
 - Extract shared `config.DataDir()` helper for XDG data-dir resolution (#144)
 - Doctor edge-branch tests: permission denied, valid anchor, spawn allowlist, malformed mcp.json (#144)
