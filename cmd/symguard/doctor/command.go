@@ -66,8 +66,11 @@ func Run(w io.Writer) int {
 	}
 
 	// Audit log: probe the XDG data path. A missing log is normal until the
-	// first `symguard decide` call creates it; a log whose chain anchor is
-	// missing or unreadable loses truncation detection and is a problem.
+	// first `symguard decide` call creates it. decide's current FileSink
+	// writes plain JSON lines without a chain anchor (the hash-chained sink
+	// is Phase 3 wiring, see cmd/symguard/decide), so a missing anchor is
+	// the expected state today and not an issue. An anchor that exists but
+	// cannot be read or parsed breaks truncation detection and is a problem.
 	logPath := defaultAuditLogPath()
 	anchorPath := audit.DefaultAnchorPath(logPath)
 	switch _, statErr := os.Stat(logPath); {
@@ -76,9 +79,12 @@ func Run(w io.Writer) int {
 	case statErr != nil:
 		report("audit log", fmt.Sprintf("error: %v", statErr), true)
 	default:
-		if _, err := os.ReadFile(anchorPath); err != nil {
-			report("audit log", fmt.Sprintf("error: anchor %s unreadable (%v)", anchorPath, err), true)
-		} else {
+		switch anchor, err := audit.ReadCheckpoint(anchorPath); {
+		case err != nil:
+			report("audit log", fmt.Sprintf("error: anchor %s: %v", anchorPath, err), true)
+		case anchor == nil:
+			report("audit log", "ok (JSONL, chain anchor pending Phase 3 sink)", false)
+		default:
 			report("audit log", "ok (hash-chained, anchor present)", false)
 		}
 	}

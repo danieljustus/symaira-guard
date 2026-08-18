@@ -161,8 +161,11 @@ func TestRun_ConfigPresent(t *testing.T) {
 }
 
 func TestRun_AuditLogWithoutAnchor(t *testing.T) {
-	// An audit log whose chain anchor is missing loses truncation
-	// detection: doctor must report it as a problem and exit non-zero.
+	// decide's current FileSink writes plain JSONL without a chain anchor
+	// (the hash-chained sink is Phase 3 wiring). A log without an anchor is
+	// therefore the expected state after any `symguard decide` call and
+	// must NOT be reported as an issue — otherwise doctor exits 1 on every
+	// real machine that ever produced a decision.
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
@@ -181,8 +184,43 @@ func TestRun_AuditLogWithoutAnchor(t *testing.T) {
 	code := Run(&buf)
 	out := buf.String()
 
+	if code != 0 {
+		t.Errorf("Run() = %d, want 0 for an anchorless JSONL log (expected pre-Phase-3 state):\n%s", code, out)
+	}
+	if !strings.Contains(out, "chain anchor pending Phase 3 sink") {
+		t.Errorf("Run() output missing anchor-pending note:\n%s", out)
+	}
+	if strings.Contains(out, "issue(s) found") {
+		t.Errorf("Run() reported issues for the expected anchorless state:\n%s", out)
+	}
+}
+
+func TestRun_AuditLogCorruptAnchor(t *testing.T) {
+	// An anchor that exists but cannot be parsed breaks truncation
+	// detection: doctor must report it as a problem and exit non-zero.
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("SYMGUARD_CONFIG", filepath.Join(t.TempDir(), "missing.toml"))
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	logPath := filepath.Join(os.Getenv("XDG_DATA_HOME"), "symguard", "audit.log")
+	if err := os.MkdirAll(filepath.Dir(logPath), 0o700); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(logPath, []byte("{\"entry\":1}\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	if err := os.WriteFile(logPath+".anchor", []byte("not json"), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	doctorSetVersion(t, "test-1.2.3")
+
+	var buf strings.Builder
+	code := Run(&buf)
+	out := buf.String()
+
 	if code != 1 {
-		t.Errorf("Run() = %d, want 1 when the audit anchor is missing:\n%s", code, out)
+		t.Errorf("Run() = %d, want 1 when the audit anchor is corrupt:\n%s", code, out)
 	}
 	if !strings.Contains(out, "audit log        error: anchor") || !strings.Contains(out, "1 issue(s) found") {
 		t.Errorf("Run() output missing anchor problem:\n%s", out)
