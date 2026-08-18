@@ -44,10 +44,10 @@ var DefaultAllowed = AllowedImports{
 	"audit":      {"model": true},
 	"output":     {},
 	"config":     {},
-	"grant":      {},
+	"grant":      {"config": true},
 	"discovery":  {"config": true},
 	"update":     {},
-	"capability": {},
+	"capability": {"config": true},
 }
 
 // Check returns a list of violations where an internal package imports

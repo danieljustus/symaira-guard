@@ -79,6 +79,7 @@ import (
 	"time"
 
 	"github.com/danieljustus/symaira-guard/internal/audit"
+	"github.com/danieljustus/symaira-guard/internal/config"
 	"github.com/danieljustus/symaira-guard/internal/model"
 )
 
@@ -273,14 +274,7 @@ func (s *FileSink) Write(rec audit.ExternalDecision) error {
 
 // defaultAuditPath returns the XDG audit log path for the default sink.
 func defaultAuditPath() string {
-	if dir := os.Getenv("XDG_DATA_HOME"); dir != "" {
-		return filepath.Join(dir, "symguard", "audit.log")
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return filepath.Join(os.TempDir(), "symguard", "audit.log")
-	}
-	return filepath.Join(home, ".local", "share", "symguard", "audit.log")
+	return filepath.Join(config.DataDir(), "audit.log")
 }
 
 // hasHelp reports whether args request help output.

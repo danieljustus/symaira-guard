@@ -129,14 +129,7 @@ func Run(w io.Writer) int {
 // mirrors the decide command's default sink so doctor probes the same file
 // the rest of symguard writes.
 func defaultAuditLogPath() string {
-	if dir := os.Getenv("XDG_DATA_HOME"); dir != "" {
-		return filepath.Join(dir, "symguard", "audit.log")
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return filepath.Join(os.TempDir(), "symguard", "audit.log")
-	}
-	return filepath.Join(home, ".local", "share", "symguard", "audit.log")
+	return filepath.Join(config.DataDir(), "audit.log")
 }
 
 // versionInfo returns the version string for display.

@@ -35,8 +35,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"time"
+
+	"github.com/danieljustus/symaira-guard/internal/config"
 )
 
 // ErrNotFound is returned when a grant ID is not present in the store.
@@ -130,13 +131,5 @@ func DefaultDir() string {
 	if env := os.Getenv("SYMGUARD_DATA"); env != "" {
 		return env
 	}
-	if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
-		return filepath.Join(xdg, "symguard")
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		// Last resort: relative path.
-		return filepath.Join(".local", "share", "symguard")
-	}
-	return filepath.Join(home, ".local", "share", "symguard")
+	return config.DataDir()
 }

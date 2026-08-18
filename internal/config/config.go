@@ -146,6 +146,23 @@ func DefaultConfig() *Config {
 	}
 }
 
+// DataDir returns the XDG data directory for symguard:
+//
+//	$XDG_DATA_HOME/symguard
+//
+// with a fallback to ~/.local/share/symguard when XDG_DATA_HOME is unset.
+// On a UserHomeDir error it falls back to os.TempDir()/symguard.
+func DataDir() string {
+	if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
+		return filepath.Join(xdg, "symguard")
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return filepath.Join(os.TempDir(), "symguard")
+	}
+	return filepath.Join(home, ".local", "share", "symguard")
+}
+
 // DefaultPath returns the XDG Base Directory path for the config file:
 //
 //	$XDG_CONFIG_HOME/symguard/config.toml

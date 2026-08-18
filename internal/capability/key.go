@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/danieljustus/symaira-guard/internal/config"
 )
 
 // KeySize is the length of key material in bytes (256 bits).
@@ -51,14 +53,7 @@ func DeriveKey(master []byte) ([]byte, error) {
 // with a fallback to ~/.local/share/symguard/capability.key when
 // XDG_DATA_HOME is unset (AGENTS.md XDG paths).
 func DefaultKeyPath() string {
-	if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
-		return filepath.Join(xdg, "symguard", "capability.key")
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return filepath.Join(".local", "share", "symguard", "capability.key")
-	}
-	return filepath.Join(home, ".local", "share", "symguard", "capability.key")
+	return filepath.Join(config.DataDir(), "capability.key")
 }
 
 // LoadKey reads key material from path. Missing or unreadable material is
