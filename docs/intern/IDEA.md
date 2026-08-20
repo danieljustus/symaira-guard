@@ -111,7 +111,7 @@ It should follow existing Symaira conventions:
 - standalone-first: works without any other Symaira tool installed,
 - optional runtime integration with sibling tools via `exec.LookPath`, MCP discovery, HTTP APIs, or config paths,
 - no compile-time dependency on sibling public tool repositories,
-- no Pro, tenant, billing, or hosted-service code in the public core,
+- no tenant, billing, or hosted-service code — the tool ships as one edition,
 - local-first defaults,
 - XDG paths:
   - config: `~/.config/symguard/config.toml`,
@@ -249,8 +249,7 @@ Research around a "Tailscale alternative for AI agents" points to a useful
 feature, but not to a new VPN product. The useful part belongs here:
 
 > `symguard` should let agents safely reach remote MCP servers and private tools
-> over already trusted transports such as Tailscale, SSH tunnels, LAN/mDNS, or a
-> future Symaira Terminal Pro relay.
+> over already trusted transports such as Tailscale, SSH tunnels, or LAN/mDNS.
 
 Initial commands could look like:
 
@@ -417,7 +416,7 @@ internal/mcp
 
 internal/remote
   Transport providers for existing secure links: ssh, tailscale, lan/mdns,
-  local, and future terminal-pro relay; no custom VPN daemon in the core
+  and local; no custom VPN daemon in the core
 
 internal/identity
   Human/client/agent/run/upstream identity model, TTLs, scoped grants
@@ -441,8 +440,7 @@ internal/redact
   PII/secret redaction before logs and memory handoff
 
 internal/integrations
-  Optional runtime integrations: symvault, symmemory, symscope, symdesk,
-  symaira-terminal-pro relay metadata
+  Optional runtime integrations: symvault, symmemory, symscope, symdesk
 ```
 
 ### 6.2 Request Flow
@@ -825,8 +823,7 @@ Build order:
 7. **Remote audit trail**
    - Log remote identity, transport, policy decision, approval, upstream server,
      tool, redaction summary, and result status.
-   - Keep logs local-first; Pro may later aggregate audit evidence only with
-     explicit team/tenant opt-in.
+   - Keep logs local-first; no aggregation off the machine.
 
 Exit criteria for this phase:
 
@@ -896,25 +893,14 @@ Exit criteria for this phase:
   - audit timeline,
   - risk dashboard.
 
-### With `symaira-terminal-pro`
+### Scope
 
-- Public `symguard` should only define the local policy/audit contract for relay-backed access.
-- Terminal Pro may later provide hosted relays, mobile companion relay, or team remote access.
-- `symguard` should consume relay metadata as a runtime provider, not import Pro code.
-- Pro relay access must still pass local `symguard` policy before any agent reaches a tool.
+`symguard` stays local-first and self-hosted, and that is the whole product —
+there is no Pro edition to hand features to.
 
-### With Pro Services
-
-Public `symguard` should stay local-first and self-hosted.
-
-Potential Pro/commercial extensions belong in private Pro repos:
-
-- team policy management,
-- centralized audit evidence retention,
-- SSO/RBAC,
-- tenant-scoped policies,
-- compliance exports,
-- managed MCP gateway for organizations.
+Deliberately out of scope: team policy management, centralized audit evidence
+retention, SSO/RBAC, tenant-scoped policies, compliance exports, and a managed
+MCP gateway for organizations.
 
 ---
 
@@ -986,7 +972,7 @@ is valuable and too large for symguard.
    - Default deny for remote writes, secrets, destructive actions, and production changes.
 
 4. **Provider-based transport reuse**
-   - Use Tailscale, SSH, LAN/mDNS, or Terminal Pro relay as providers.
+   - Use Tailscale, SSH, or LAN/mDNS as providers.
    - Avoid owning WireGuard/NAT/DNS until there is overwhelming evidence.
 
 5. **Dynamic discovery with pinning**
